@@ -1,3 +1,3 @@
 # sso
 
-Integrasikan CLAY dengan fitur sso 
+Integrasikan CLAY dengan fitur Master function helper
