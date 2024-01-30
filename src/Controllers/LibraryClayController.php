@@ -33,7 +33,7 @@ class LibraryClayController extends Controller
         $data_sync_master = [];
 
         $model_lokal = 'Bangsamu\Master\Models\\' . $tabel_lokal;
-        $model_master = isset($data_master) ? null : 'Bangsamu\Master\Models\\' . $tabel_master;
+        $model_master = empty($data_master) ? null : 'Bangsamu\Master\Models\\' . @$tabel_master;
 
         if ($id) {
             $data_sync_lokal = $model_lokal::where('id', $id);
@@ -170,7 +170,7 @@ class LibraryClayController extends Controller
                             $respond['code'] = 400;
                             $respond['data'] = $return;
 
-                            Response::make(setOutput($respond))->send();
+                            Response::make(self::setOutput($respond))->send();
                             exit();
                         }
                     }
@@ -220,7 +220,7 @@ class LibraryClayController extends Controller
         $validator = Validator::make($request_all, $rules);
         if ($validator->fails()) {
             $error = $validator->errors();
-            Response::make(validateError($error))->send();
+            Response::make(self::validateError($error))->send();
             exit();
         }
         return true;
@@ -239,7 +239,7 @@ class LibraryClayController extends Controller
         $data['code'] = '400';
         $data['data'] = $error;
 
-        return setOutput($data);
+        return self::setOutput($data);
     }
 
 
@@ -285,13 +285,13 @@ class LibraryClayController extends Controller
             $respond['code'] = 400;
             $respond['data'] = 'nama_tabel belum di definisikan';
 
-            Response::make(setOutput($respond))->send();
+            Response::make(self::setOutput($respond))->send();
             exit();
         }
         // $nama_tabel = $nama_tabel ?? 'webhook';
 
         /*backup dahulu sebelum di hapus*/
-        $dump_tabel = ExportDatabase([$nama_tabel]);
+        $dump_tabel = self::ExportDatabase([$nama_tabel]);
 
         try {
             $drop = Schema::drop($nama_tabel);
@@ -685,12 +685,12 @@ class LibraryClayController extends Controller
         return $group_str;
     }
 
-    static public function checkPermission($permission)
-    {
-        $result = auth()->user()->can($permission);
+    // static public function checkPermission($permission)
+    // {
+    //     $result = auth()->user()->can($permission);
 
-        return $result;
-    }
+    //     return $result;
+    // }
 
     static public function getEmployeeByName($label)
     {
@@ -1128,46 +1128,46 @@ class LibraryClayController extends Controller
         return $list_file;
     }
 
-    static public function cekEvent($data)
-    {
-        /*event git*/
-        if (isset($data->result['repository']['name']) || isset($data->result['commits'][0]['message']) || isset($data->result['push']['changes'])) {
-            $git_branch = $data->result['repository']['name'];
-            $git_commit = isset($data->result['commits'][0]['message']) ? $data->result['commits'][0]['message'] : $data->result['push']['changes'][0]['commits'][0]['message'];
-            $git_pull = self::gitPull($git_branch, $git_commit);
-            $data->git_pull = $git_pull;
-        } else {
-            $data = '';
-        }
+    // static public function cekEvent($data)
+    // {
+    //     /*event git*/
+    //     if (isset($data->result['repository']['name']) || isset($data->result['commits'][0]['message']) || isset($data->result['push']['changes'])) {
+    //         $git_branch = $data->result['repository']['name'];
+    //         $git_commit = isset($data->result['commits'][0]['message']) ? $data->result['commits'][0]['message'] : $data->result['push']['changes'][0]['commits'][0]['message'];
+    //         $git_pull = self::gitPull($git_branch, $git_commit);
+    //         $data->git_pull = $git_pull;
+    //     } else {
+    //         $data = '';
+    //     }
 
-        return $data;
-    }
+    //     return $data;
+    // }
 
-    static public function gitPull($branch, $message)
-    {
-        $deploy = str_contains($message, '#deploy');
-        // dd(1, $action, $branch, $message);
+    // static public function gitPull($branch, $message)
+    // {
+    //     $deploy = str_contains($message, '#deploy');
+    //     // dd(1, $action, $branch, $message);
 
-        if ($deploy) {
-            $task_file = storage_path('job.json');
-            $task_list =  File::get($task_file);
-            $task_list_arry = json_decode($task_list, true);
-            // dd($task_list_arry);
-            foreach ($task_list_arry['task'] as $job => $task) {
-                // dd($task);
-                if (method_exists($this, 'task_' . $task['type'])) {
-                    $respond[$job]['script'] =  $task['script'];
-                    $respond[$job]['respond'] = self::{'task_' . $task['type']}($task['script']);
-                } else {
-                    $respond[$job] = 'tidak ada task';
-                }
-            }
-            // dd($respond);
-        } else {
-            $respond = 'tidak ada perintah deploy';
-        }
+    //     if ($deploy) {
+    //         $task_file = storage_path('job.json');
+    //         $task_list =  File::get($task_file);
+    //         $task_list_arry = json_decode($task_list, true);
+    //         // dd($task_list_arry);
+    //         foreach ($task_list_arry['task'] as $job => $task) {
+    //             // dd($task);
+    //             if (method_exists($this, 'task_' . $task['type'])) {
+    //                 $respond[$job]['script'] =  $task['script'];
+    //                 $respond[$job]['respond'] = self::{'task_' . $task['type']}($task['script']);
+    //             } else {
+    //                 $respond[$job] = 'tidak ada task';
+    //             }
+    //         }
+    //         // dd($respond);
+    //     } else {
+    //         $respond = 'tidak ada perintah deploy';
+    //     }
 
 
-        return $respond;
-    }
+    //     return $respond;
+    // }
 }
