@@ -33,7 +33,7 @@ class LibraryClayController extends Controller
         $data_sync_master = [];
 
         $model_lokal = 'Bangsamu\Master\Models\\' . $tabel_lokal;
-        $model_master = empty($data_master) ? null : 'Bangsamu\Master\Models\\' . @$tabel_master;
+        $model_master = isset($data_master) ? null : 'Bangsamu\Master\Models\\' . $tabel_master;
 
         if ($id) {
             $data_sync_lokal = $model_lokal::where('id', $id);
