@@ -46,6 +46,9 @@ class LibraryClayController extends Controller
                 // Response::make(validateError('data not foud'))->send();
                 // exit();
                 $data_sync_lokal = $data_sync_lokal->get();
+                if ($model_master) {
+                    $data_sync_master = $data_sync_master->get();
+                }
             } else {
                 $data_sync_lokal = $data_sync_lokal->get();
                 if ($model_master) {
@@ -124,9 +127,13 @@ class LibraryClayController extends Controller
         foreach ($sync_insert as $keyId) {
             $data = @$data_array_map_master[$keyId];
             try {
-
-                $model_lokal::create($data);
-                // Employee::create($data);
+                if(isset($data['id'])){
+                    //jika ada data id pakek insert dengan id
+                    $model_lokal::insert($data);
+                }else{
+                    //insert dengan auto incerment id
+                    $model_lokal::create($data);
+                }
                 $log['insert'][$keyId]['status'] = 'sukses';
             } catch (\Exception $e) {
                 $log['insert'][$keyId]['status'] = 'gagal ' . $e->getMessage();
@@ -154,6 +161,7 @@ class LibraryClayController extends Controller
                 // dd($key_master, $key_lokal);
                 foreach ($key_master as $keyM => $valM) {
                     /*replace jika beda*/
+                    // dd($key_lokal[$keyM],$valM,$key_lokal,$key_master);
                     if ($key_lokal[$keyM] != $valM) {
                         $val[$key_lokal[$keyM]] = @$val[$valM];/*remaping data*/
                         $data_array_map_master[$val['id']] = $val;
