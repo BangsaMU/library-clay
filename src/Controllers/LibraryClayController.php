@@ -97,14 +97,24 @@ class LibraryClayController extends Controller
 
             /*cek jika berbeda data*/
             $cek_diff = array_diff_assoc($data_master, $data_lokal);
+
+            if (isset($cek_diff['created_at'])) {
+                $cek_diff['created_at'] = date('Y-m-d H:i:s', strtotime($cek_diff['created_at']));
+            }
+            if (isset($cek_diff['updated_at'])) {
+                $cek_diff['updated_at'] = date('Y-m-d H:i:s', strtotime($cek_diff['updated_at']));
+            }
+
             if ($cek_diff) {
                 try {
 
+                    // $data = @$data_array_map_master[$keyId];
+                    // dd($data);
                     $origin = $model_lokal::where('id', $keyId);
                     // $origin = Employee::where('id', $keyId);
                     $origin_data = $origin->first()->toArray();
                     $origin_change = array_intersect_key($origin_data, $cek_diff);
-                    // dd($a,$origin_data,$cek_diff);
+                    // dd($a,$origin_data,$cek_diff,date('d-m-Y', $cek_diff['updated_at']));
                     $origin->update($cek_diff);
                     $log['update'][$keyId]['status'] = 'sukses';
                     // $log['update'][$keyId]['data'] = $cek_diff;
@@ -127,10 +137,10 @@ class LibraryClayController extends Controller
         foreach ($sync_insert as $keyId) {
             $data = @$data_array_map_master[$keyId];
             try {
-                if(isset($data['id'])){
+                if (isset($data['id'])) {
                     //jika ada data id pakek insert dengan id
                     $model_lokal::insert($data);
-                }else{
+                } else {
                     //insert dengan auto incerment id
                     $model_lokal::create($data);
                 }
@@ -267,9 +277,11 @@ class LibraryClayController extends Controller
             $status = $respon['status'] ?? 'sukses';
             $code = $respon['code'] ?? '200';
             $data = $respon['data'] ?? $respon->object();
+            $message = $respon['message'] ?? '';
             $return['status'] = $status;
             $return['code'] = $code;
             $return['data'] = $data;
+            $return['message'] = @$message;
             // dd($respon);
         } else {
             $return = $respon->{$type}();
