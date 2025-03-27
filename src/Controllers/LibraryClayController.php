@@ -20,11 +20,71 @@ use App\Models\Project;
 use App\Models\Employee;
 use App\Models\Gallery;
 use App\Models\NotifConfig;
+use Illuminate\Http\Client\Pool;
+use Illuminate\Support\Facades\Http;
 
 Carbon::setLocale('id');
 
 class LibraryClayController extends Controller
 {
+
+    static public function updateMaster(array $parmData): string
+    {
+        // dd($parmData);
+        if (Schema::connection('db_master')->hasTable($parmData['sync_tabel'])) {
+            $update_data = DB::connection('db_master')
+                ->table($parmData['sync_tabel'])
+                ->where('id', $parmData['sync_id'])
+                ->update($parmData['sync_row']);
+         } else {
+            $update_data =  "Tabel " . $parmData['sync_tabel'] . " tidak ditemukan di database db_master.";
+        }
+        return $update_data;
+    }
+
+    static public function callbackSyncMaster(array $parmData): array
+    {
+        // dd(config('MasterCrudConfig.MASTER_DIRECT_EDIT'),$parmData);
+        extract($parmData);
+        $list_callback = $sync_list_callback;
+        $data["tabel"] = $sync_tabel; //"project";
+        $data["rows"][] = $sync_row;
+        $id = $sync_id;
+
+        $sync = Http::pool(function (Pool $pool) use ($list_callback, $id, $data, $parmData) {
+
+            extract($parmData);
+            $index = 1;
+            foreach ($list_callback as $keyL => $url) {
+                // dd($keyL , $url);
+                if (json_decode($url)) {
+                    $list_url = json_decode($url);
+                } else {
+                    $list_url[] = $url;
+                };
+                if ($keyL == 'GET') {
+                    foreach ($list_url as $url) {
+                        $arrayPools[] = $pool->as($keyL . $index)->timeout(config('SsoConfig.curl.TIMEOUT', 5))->withOptions([
+                            'verify' => config('SsoConfig.curl.VERIFY', false),
+                        ])->get($url . '/' . $id);
+                        $index++;
+                    }
+                }
+                if ($keyL == 'POST') {
+                    foreach ($list_url as $url) {
+                        $arrayPools[] = $pool->as($keyL . $index)->timeout(config('SsoConfig.curl.TIMEOUT', 5))->withOptions([
+                            'verify' => config('SsoConfig.curl.VERIFY', false),
+                        ])->withBody(json_encode($data), 'application/json')->post($url . '/' . $sync_tabel . '/' . $sync_id);
+                        $index++;
+                    }
+                }
+                return $arrayPools;
+            }
+        });
+        // dd($list_callback,json_encode($data),$sync['POST']->body());
+        return $sync;
+    }
+
     /*convert array master index ke key dengan id */
     static public function getDataSync(array $dataVar): array
     {
@@ -34,6 +94,7 @@ class LibraryClayController extends Controller
 
         $model_lokal = 'Bangsamu\Master\Models\\' . $tabel_lokal;
         $model_master = isset($data_master) ? null : 'Bangsamu\Master\Models\\' . $tabel_master;
+
 
         if ($id) {
             $data_sync_lokal = $model_lokal::where('id', $id);
@@ -105,9 +166,9 @@ class LibraryClayController extends Controller
                 $cek_diff['updated_at'] = date('Y-m-d H:i:s', strtotime($cek_diff['updated_at']));
             }
 
-            if ($cek_diff) {
+            if (!empty($cek_diff)) {
                 try {
-
+                    // dd(1,!empty($cek_diff),$cek_diff);
                     // $data = @$data_array_map_master[$keyId];
                     // dd($data);
                     $origin = $model_lokal::where('id', $keyId);
@@ -136,6 +197,14 @@ class LibraryClayController extends Controller
 
         foreach ($sync_insert as $keyId) {
             $data = @$data_array_map_master[$keyId];
+
+            if (isset($data['created_at'])) {
+                $data['created_at'] = date('Y-m-d H:i:s', strtotime($data['created_at']));
+            }
+            if (isset($data['updated_at'])) {
+                $data['updated_at'] = date('Y-m-d H:i:s', strtotime($data['updated_at']));
+            }
+
             try {
                 if (isset($data['id'])) {
                     //jika ada data id pakek insert dengan id
