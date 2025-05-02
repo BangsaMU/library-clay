@@ -30,16 +30,45 @@ class LibraryClayController extends Controller
 
     static public function updateMaster(array $parmData): string
     {
-        // dd($parmData);
-        if (Schema::connection('db_master')->hasTable($parmData['sync_tabel'])) {
-            $update_data = DB::connection('db_master')
-                ->table($parmData['sync_tabel'])
-                ->where('id', $parmData['sync_id'])
-                ->update($parmData['sync_row']);
-         } else {
-            $update_data =  "Tabel " . $parmData['sync_tabel'] . " tidak ditemukan di database db_master.";
+        $connection = DB::connection('db_master');
+
+        if (!Schema::connection('db_master')->hasTable($parmData['sync_tabel'])) {
+            return "Tabel " . $parmData['sync_tabel'] . " tidak ditemukan di database db_master.";
         }
-        return $update_data;
+
+        // Pisahkan primary key dan data yang di-update
+        $conditions = ['id' => $parmData['sync_id']];
+        $updateData = $parmData['sync_row'];
+
+        // Hapus `id` agar tidak menyebabkan masalah saat insert
+        unset($updateData['id']);
+
+        // Pastikan ada timestamp untuk insert/update
+        $now = Carbon::now();
+
+        // Cek apakah data sudah ada
+        $existing = $connection->table($parmData['sync_tabel'])->where('id', $parmData['sync_id'])->exists();
+
+        if ($existing) {
+            // Jika data ada, update `updated_at`
+            $updateData['updated_at'] = $now;
+
+            // Update data
+            $updated = $connection->table($parmData['sync_tabel'])
+                ->where('id', $parmData['sync_id'])
+                ->update($updateData);
+
+            return $updated ? "Data berhasil diperbarui." : "Gagal memperbarui data.";
+        } else {
+            // Jika data tidak ada, tambahkan `created_at` dan `updated_at`
+            $updateData['created_at'] = $now;
+            $updateData['updated_at'] = $now;
+
+            // Insert data baru
+            $inserted = $connection->table($parmData['sync_tabel'])->insert(array_merge($conditions, $updateData));
+
+            return $inserted ? "Data berhasil ditambahkan." : "Gagal menambahkan data.";
+        }
     }
 
     static public function callbackSyncMaster(array $parmData): array
