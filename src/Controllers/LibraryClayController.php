@@ -18,6 +18,7 @@ use App\Models\ActionAttachment;
 use App\Models\FileManager;
 use App\Models\Project;
 use App\Models\Employee;
+use Bangsamu\Master\Models\MasterKecamatan;
 use App\Models\Gallery;
 use App\Models\NotifConfig;
 use Illuminate\Http\Client\Pool;
@@ -27,6 +28,40 @@ Carbon::setLocale('id');
 
 class LibraryClayController extends Controller
 {
+
+    static public function isValidNIK($nik)
+    {
+        // Cek panjang dan hanya angka
+        if (!preg_match('/^\d{16}$/', $nik)) {
+            return false;
+        }
+
+        // Ambil 6 digit pertama sebagai kode kecamatan
+        $kodeWilayah = substr($nik, 0, 6);
+
+        // Cek apakah kode wilayah ini ada di tabel master_kecamatan
+        $wilayah = MasterKecamatan::find($kodeWilayah);
+        if (!$wilayah) {
+            return false;
+        }
+
+        // Ambil dan olah tanggal lahir dari NIK
+        $day = intval(substr($nik, 6, 2));
+        $month = intval(substr($nik, 8, 2));
+        $year = intval(substr($nik, 10, 2));
+
+        // Koreksi untuk perempuan (40+)
+        if ($day > 40) {
+            $day -= 40;
+        }
+
+        // Validasi kombinasi tanggal
+        $valid1900 = checkdate($month, $day, 1900 + $year);
+        $valid2000 = checkdate($month, $day, 2000 + $year);
+        // dd($nik,$wilayah,$valid1900 , $valid2000, $year,$month, $day);
+        return $valid1900 || $valid2000;
+    }
+
 
     static public function updateMaster(array $parmData): string
     {
@@ -1214,9 +1249,7 @@ class LibraryClayController extends Controller
         return true;
     }
 
-    static public function deleteFileManager($id)
-    {
-    }
+    static public function deleteFileManager($id) {}
 
     static public function get_dirty($dirty)
     {
