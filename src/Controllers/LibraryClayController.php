@@ -1332,6 +1332,9 @@ class LibraryClayController extends Controller
 
     static public function validate_token($data, $token)
     {
+        if (!is_string($token) || empty($token)) {
+            return false;
+        }
         $expected = hash_hmac('sha256', $data, config('SsoConfig.main.KEY'));
         return hash_equals($expected, $token);
     }
