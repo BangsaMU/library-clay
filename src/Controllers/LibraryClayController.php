@@ -1321,4 +1321,36 @@ class LibraryClayController extends Controller
 
     //     return $respond;
     // }
+
+    static public function api_token($data)
+    {
+        // $token = md5($data . ':' . config('SsoConfig.main.KEY'));
+
+        $token = hash_hmac('sha256', $data, config('SsoConfig.main.KEY'));
+        return $token;
+    }
+
+    static public function validate_token($data, $token)
+    {
+        $expected = hash_hmac('sha256', $data, config('SsoConfig.main.KEY'));
+        return hash_equals($expected, $token);
+    }
+
+    static public function convertTableNameToModel($tableName)
+    {
+        return str_replace(' ', '', ucwords(str_replace('_', ' ', $tableName)));
+    }
+
+    static public function resolveModelFromSheetSlug($slug)
+    {
+        $className = str_replace(' ', '', ucwords(str_replace('_', ' ', $slug)));
+        $modelClass = "Bangsamu\\Master\\Models\\" . $className;
+
+        if (!class_exists($modelClass)) {
+            // throw new \Exception("Model class [$modelClass] does not exist.");
+            abort(403, "Model class [$modelClass] does not exist.");
+        }
+
+        return app($modelClass);
+    }
 }

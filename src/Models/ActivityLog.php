@@ -5,10 +5,16 @@ namespace Bangsamu\LibraryClay\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Bangsamu\Master\Models\User;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Database\Schema\Blueprint;
 
 class ActivityLog extends Model
 {
     use HasFactory;
+
+    public $table = "activity_logs";
+    protected $guarded = [];
+
 
     /**
      * The attributes that are mass assignable.
@@ -104,5 +110,32 @@ class ActivityLog extends Model
     public function getFormattedDateAttribute()
     {
         return $this->created_at->format('M d, Y h:i A');
+    }
+
+
+    protected static $hasCheckedTable = false;
+
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        if (!self::$hasCheckedTable) {
+            self::$hasCheckedTable = true;
+            if (!Schema::hasTable((new static)->getTable())) {
+                Schema::create((new static)->getTable(), function (Blueprint $table) {
+                    $table->bigIncrements('id');
+                    $table->unsignedBigInteger('user_id')->nullable();
+                    $table->string('action');
+                    $table->string('model_type')->nullable();
+                    $table->unsignedBigInteger('model_id')->nullable();
+                    $table->text('description');
+                    $table->longText('properties')->nullable()->collation('utf8mb4_bin');
+                    $table->string('ip_address')->nullable();
+                    $table->string('user_agent')->nullable();
+                    $table->timestamps();
+                });
+            }
+        }
     }
 }
