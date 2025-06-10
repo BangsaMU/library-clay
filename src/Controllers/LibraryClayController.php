@@ -150,7 +150,7 @@ class LibraryClayController extends Controller
     }
 
     /*convert array master index ke key dengan id */
-    static public function getDataSync(array $dataVar): array
+    static public function getDataSync(array $dataVar,$withTrashed=false): array
     {
         extract($dataVar);
         $data_sync_master_count = isset($data_master) ? count($data_master) : 0;
@@ -181,9 +181,19 @@ class LibraryClayController extends Controller
                 }
             }
         } else {
-            $data_sync_lokal = $model_lokal::all();
+            // tampilkan dengan yang dihapus
+            if($withTrashed==true){
+                $data_sync_lokal = $model_lokal::withTrashed()->get();
+            }else{
+                $data_sync_lokal = $model_lokal::all();
+            }
             if ($model_master) {
-                $data_sync_master = $model_master::all();
+                // tampilkan dengan yang dihapus
+                if($withTrashed==true){
+                    $data_sync_master = $model_master::withTrashed()->get();
+                } else {
+                    $data_sync_master = $model_master::all();
+                }
             }
         }
         // dd($tabel_lokal, $tabel_master, compact('data_sync_lokal', 'data_sync_master'));
