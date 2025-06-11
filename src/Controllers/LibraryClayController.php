@@ -28,6 +28,31 @@ Carbon::setLocale('id');
 
 class LibraryClayController extends Controller
 {
+    static public function convertDate($dateString, $outputFormat = 'Y-m-d')
+    {
+        $formats = [
+            'd/m/y',
+            'd/m/Y',
+            'd/M/Y',
+            'd-m-y',
+            'd-m-Y',
+            'd-M-y',
+            'd-M-Y',
+            // Add more formats if needed
+        ];
+
+        foreach ($formats as $format) {
+            try {
+                $carbonDate = Carbon::createFromFormat($format, $dateString);
+                return $carbonDate->format($outputFormat);
+            } catch (\Exception $e) {
+                // Continue to the next format if the current one fails
+            }
+        }
+
+        // If none of the formats is recognized
+        return "Error parsing date: Unrecognized date format";
+    }
 
     static public function isValidNIK($nik)
     {
