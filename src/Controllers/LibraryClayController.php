@@ -28,6 +28,49 @@ Carbon::setLocale('id');
 
 class LibraryClayController extends Controller
 {
+    // Contoh penggunaan
+    // $ktp = "3602142804890003";
+    // $result = extractDataKTP($ktp);
+    // print_r($result);
+    static public function extractDataKTP($ktp)
+    {
+        if(strlen($ktp) !== 16) {
+        return [
+                'tanggalLahir' => null,
+                'jenisKelamin' => null
+            ];
+        }
+
+        // Ambil 6 digit mulai dari ke-7 hingga ke-12
+        $birthDate = substr($ktp, 6, 6);
+
+        // Ambil 2 digit pertama sebagai hari lahir
+        $day = intval(substr($birthDate, 0, 2));
+
+        // Tentukan jenis kelamin berdasarkan hari lahir
+        $gender = $day >= 40 ? "Perempuan" : "Laki-laki";
+
+        // Jika hari >= 40, kurangi 40 untuk mendapatkan hari yang sebenarnya
+        if ($day >= 40) {
+            $day -= 40;
+        }
+
+        // Ambil bulan dan tahun
+        $month = substr($birthDate, 2, 2);
+        $year = substr($birthDate, 4, 2);
+
+        // Tentukan abad untuk tahun, misal: 2000-an atau 1900-an
+        $fullYear = intval($year) >= 0 && intval($year) <= 23 ? "20$year" : "19$year";
+
+        // Format tanggal ke YYYY-MM-DD
+        $formattedDate = sprintf('%s-%s-%02d', $fullYear, $month, $day);
+
+        return [
+            'tanggalLahir' => $formattedDate,
+            'jenisKelamin' => $gender
+        ];
+    }
+
     static public function convertDate($dateString, $outputFormat = 'Y-m-d')
     {
         $formats = [
