@@ -23,6 +23,8 @@ use App\Models\Gallery;
 use App\Models\NotifConfig;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Support\Facades\Http;
+use setasign\Fpdi\Tcpdf\Fpdi;
+use Bangsamu\Master\Models\Setting;
 
 Carbon::setLocale('id');
 
@@ -133,6 +135,7 @@ class LibraryClayController extends Controller
 
     static public function updateMaster(array $parmData): string
     {
+        // dd($parmData);
         $connection = DB::connection('db_master');
 
         if (!Schema::connection('db_master')->hasTable($parmData['sync_tabel'])) {
@@ -142,6 +145,16 @@ class LibraryClayController extends Controller
         // Pisahkan primary key dan data yang di-update
         $conditions = ['id' => $parmData['sync_id']];
         $updateData = $parmData['sync_row'];
+        $key_unik = $parmData['key_unik']??'id';
+        $key_unik_val = $parmData['sync_id'];
+        // $field_key = $parmData['fieldKey'] ?? null;
+        $field_key = $parmData['fieldKey'] ?? null; // ✅ Benar
+
+
+        // Validasi kolom key_unik
+        if (!Schema::connection('db_master')->hasColumn($parmData['sync_tabel'], $key_unik)) {
+            return "Kolom '$key_unik' tidak ditemukan di tabel '{$parmData['sync_tabel']}' pada database db_master.";
+        }
 
         // Hapus `id` agar tidak menyebabkan masalah saat insert
         unset($updateData['id']);
@@ -149,18 +162,77 @@ class LibraryClayController extends Controller
         // Pastikan ada timestamp untuk insert/update
         $now = Carbon::now();
 
-        // Cek apakah data sudah ada
-        $existing = $connection->table($parmData['sync_tabel'])->where('id', $parmData['sync_id'])->exists();
 
-        if ($existing) {
+        // Cek apakah data sudah ada
+        // Bangun query dasar
+        $query = $connection->table($parmData['sync_tabel'])
+            ->where($key_unik,'=', $key_unik_val);
+
+        // Tambahkan kondisi field_key jika diset dan tidak kosong/null khusu tabel master_user_details atau user_details
+        if (!empty($field_key)&&($parmData['sync_tabel']=='master_user_details'|| $parmData['sync_tabel']=='user_details')) {
+            $query->where('field_key', $field_key);
+        }
+        // if($parmData['sync_tabel']=='master_user_details'){
+        //     dd($parmData,$query->exists(),$query->getBindings());
+        // }
+        // Cek apakah data sudah ada
+        $exists = $query->exists();
+
+        // if ($parmData['sync_tabel']=='master_user_details'|| $parmData['sync_tabel']=='user_details') {
+        //     $exists = $connection->table($parmData['sync_tabel'])->where($key_unik,'=', $key_unik_val)->where('field_key','=', $field_key)->exists();
+        // }else{
+        //     $exists = $connection->table($parmData['sync_tabel'])->where('id', $parmData['sync_id'])->exists();
+        // }
+        // $exists = true;
+
+        if ($exists) {
+
             // Jika data ada, update `updated_at`
             $updateData['updated_at'] = $now;
 
             // Update data
-            $updated = $connection->table($parmData['sync_tabel'])
-                ->where('id', $parmData['sync_id'])
-                ->update($updateData);
+            // dd(9,$parmData,$key_unik,$exists,$parmData['sync_tabel']);
+            // $updated = $connection->table($parmData['sync_tabel'])
+            //     ->where($key_unik, $key_unik_val)
+            //     ->update($updateData);
+            $matchCondition = [$key_unik => $key_unik_val];
+            // Tambahkan field_key ke kondisi jika ada
+            if (!is_null($field_key)) {
+                $matchCondition['field_key'] = $field_key;
+            }
 
+
+            // Ambil list kolom dari tabel
+            $columns = Schema::connection('db_master')->getColumnListing($parmData['sync_tabel']);
+
+            // Validasi key_unik
+            if (!in_array($key_unik, $columns)) {
+                return response()->json([
+                    'error' => "Kolom `$key_unik` tidak ditemukan di tabel {$parmData['sync_tabel']}"
+                ], 400);
+            }
+
+            // Validasi field_key jika dipakai sebagai kondisi
+            if (!is_null($field_key) && !in_array('field_key', $columns)) {
+                return response()->json([
+                    'error' => "Kolom `field_key` tidak ditemukan di tabel {$parmData['sync_tabel']}"
+                ], 400);
+            }
+
+            $matchCondition = [$key_unik => $key_unik_val];
+            if (!is_null($field_key)) {
+                $matchCondition['field_key'] = $field_key;
+            }
+
+            $updateData['updated_at'] = Carbon::now();
+
+            $updated = $connection->table($parmData['sync_tabel'])->updateOrInsert(
+                $matchCondition,
+                $updateData
+            );
+
+
+            // dd('updated::',$updated,config('MasterCrudConfig.MASTER_DIRECT_EDIT'));
             return $updated ? "Data berhasil diperbarui." : "Gagal memperbarui data.";
         } else {
             // Jika data tidak ada, tambahkan `created_at` dan `updated_at`
@@ -170,6 +242,7 @@ class LibraryClayController extends Controller
             // Insert data baru
             $inserted = $connection->table($parmData['sync_tabel'])->insert(array_merge($conditions, $updateData));
 
+            // dd('inserted::',$inserted,config('MasterCrudConfig.MASTER_DIRECT_EDIT'));
             return $inserted ? "Data berhasil ditambahkan." : "Gagal menambahkan data.";
         }
     }
@@ -1434,4 +1507,124 @@ class LibraryClayController extends Controller
 
         return app($modelClass);
     }
+
+
+
+    public static function getSettings($key = null, $default = null)
+    {
+        if (app()->bound('settings')) {
+            return app('settings')->get($key, $default);
+        }
+
+        return $default;
+    }
+
+    //fungsi buat cek ada http / https
+    function getFixedUrl($url)
+    {
+
+        if (!preg_match('~^https?://~', $url)) {
+            $url = url($url);
+        }
+
+        return $url;
+    }
+
+    // full path storage... file ada bug jika pdf 1.7
+    function getTotalPages($file) {
+        $checkPdfVersion = $this->checkPdfVersion($file);
+        // array:4 [▼ // app/Helpers/Helper.php:755
+        //   "version" => "1.7"
+        //   "pdf_path" => "/var/www/html/gda-meindo/storage/app/public/requisitions/22/pdf_1.4/686dea14b6759_taxi-25-007-1.pdf"
+        //   "pdf_path_1_4" => "/var/www/html/gda-meindo/storage/app/public/requisitions/22/pdf_1.4/686dea14b6759_taxi-25-007-1.pdf"
+        //   "pdf_source" => "/var/www/html/gda-meindo/storage/app/public/requisitions/22/686dea14b6759_taxi-25-007-1.pdf"
+        // ]
+        // dd($checkPdfVersion['pdf_path']);
+        $pdf = new Fpdi();
+        $pageCount = $pdf->setSourceFile($checkPdfVersion['pdf_path']);
+        return $pageCount;
+
+    }
+
+    function checkPdfVersion($source_file, $path_file_new = null)
+    {
+        // $filename = basename($source_file);
+
+        // dd( $info_file["dirname"] . '/pdf_1.4/' . $info_file["filename"], $info_file);
+        // array:4 [▼ // app/Helpers/helpers.php:46
+        // "dirname" => "/var/www/html/mr-meindo/storage/app/public/gallery/pdf"
+        // "basename" => "10-dummy-v1.6.pdf"
+        // "extension" => "pdf"
+        // "filename" => "10-dummy-v1.6"
+        // ]
+        // read pdf file first line because pdf first line contains pdf version information
+
+        if (!file_exists($source_file)) {
+            abort(403, "checkPdfVersion not found file::" . $source_file);
+        }
+
+        $filepdf = fopen($source_file, "r");
+        if ($filepdf) {
+            $line_first = fgets($filepdf);
+            fclose($filepdf);
+        } else {
+            echo "error opening the file.";
+        }
+
+        // extract number such as 1.4,1.5 from first read line of pdf file
+        preg_match_all('!\d+!', $line_first, $matches);
+
+        // save that number in a variable
+        $pdfversion = implode('.', $matches[0]);
+
+        // dd($pdfversion,$pdfversion > "1.8");
+        if ($pdfversion > "1.4") {
+
+            $info_file = pathinfo($source_file);
+            // dd($info_file);
+            // array:4 [▼ // app/Helpers/Helper.php:797
+            //     "dirname" => "/var/www/html/gda-meindo/storage/app/public/requisitions/22"
+            //     "basename" => "686de94d57019_taxi-25-007-1.pdf"
+            //     "extension" => "pdf"
+            //     "filename" => "686de94d57019_taxi-25-007-1"
+            // ]
+            $source_file_new = $path_file_new ?? $info_file["dirname"] . '/pdf_1.4/' . $info_file["basename"];
+
+            if (!file_exists($source_file_new)) {
+                $path_file = pathinfo($source_file_new);
+                // Periksa apakah direktori ada
+                if (!is_dir($path_file["dirname"])) {
+                    // Jika tidak ada, buat direktori
+                    if (mkdir($path_file["dirname"], 0777, true)) {
+                        echo 'Direktori $path_file["dirname"] berhasil dibuat.';
+                    } else {
+                        echo 'Terjadi kesalahan saat membuat direktori ' . $path_file["dirname"];
+                    }
+                }
+
+                // dd($path_file);
+                // dd($source_file_new);
+                // /var/www/html/meindo-annotation/storage/app/public/unec-edu-az/pdf-sample-20.pdf
+                // echo "tidak bisa edit pdf diatas 1.4 pdf yang akan di edit versi:" . $pdfversion;
+                // exit();
+                // USE GHOSTSCRIPT IF PDF VERSION ABOVE 1.4 AND SAVE ANY PDF TO VERSION 1.4 , SAVE NEW PDF OF 1.4 VERSION TO NEW PATH
+                // dd($source_file_new);
+                $run_script = 'gs -dBATCH -dNOPAUSE -dQUIET -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -sOutputFile="' . $source_file_new . '" "' . $source_file . '"';
+
+                // $run_script = 'gs -dBATCH -dNOPAUSE -q -sDEVICE=pdfwrite -sOutputFile="' . $source_file . '" "' . $source_file . '" version=1.4';
+                $a = shell_exec($run_script);
+                // echo "<br>run_script:" . $run_script;
+                // echo "<br>convert" . $a;
+                // exit();
+            }
+        }
+        return [
+            'version'=>$pdfversion,
+            'pdf_path'=>$source_file_new ?? $source_file,
+            'pdf_path_1_4'=>$source_file_new??'',
+            'pdf_source'=>$source_file,
+        ];
+    }
+
+
 }
