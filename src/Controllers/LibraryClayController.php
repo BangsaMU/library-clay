@@ -30,6 +30,15 @@ Carbon::setLocale('id');
 
 class LibraryClayController extends Controller
 {
+    /**
+     * Mengganti karakter berbahaya di nama file
+     */
+    public static function sanitizeFileName(string $fileName): string
+    {
+        // Hilangkan karakter yang tidak aman
+        return preg_replace('/[^A-Za-z0-9_\-\. ]/', '', $fileName);
+    }
+
     // Contoh penggunaan
     // $ktp = "3602142804890003";
     // $result = extractDataKTP($ktp);

@@ -3,6 +3,8 @@
 namespace Bangsamu\LibraryClay;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Contracts\Http\Kernel;
+use Bangsamu\LibraryClay\Middleware\ForceAppUrl;
 
 class LibraryClayPackageServiceProvider extends ServiceProvider
 {
@@ -44,6 +46,10 @@ class LibraryClayPackageServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__ . '/routes.php' => base_path('routes/LibraryClay.php'),
         ]);
+
+        // Daftarkan middleware global
+        $kernel = $this->app->make(Kernel::class);
+        $kernel->pushMiddleware(ForceAppUrl::class);
     }
 
     /**
