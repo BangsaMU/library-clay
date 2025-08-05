@@ -39,11 +39,20 @@ class LibraryClayController extends Controller
         return preg_replace('/[^A-Za-z0-9_\-\. ]/', '', $fileName);
     }
 
+
+    public static function getSettingByCategory($category)
+    {
+        $SettingCategory = Setting::where('category', $category)
+            ->get()->pluck('value', 'name');
+
+        return $SettingCategory;
+    }
+
     // Contoh penggunaan
     // $ktp = "3602142804890003";
     // $result = extractDataKTP($ktp);
     // print_r($result);
-    static public function extractDataKTP($ktp)
+    public static function extractDataKTP($ktp)
     {
         if(strlen($ktp) !== 16) {
         return [
@@ -82,7 +91,7 @@ class LibraryClayController extends Controller
         ];
     }
 
-    static public function convertDate($dateString, $outputFormat = 'Y-m-d')
+    public static function convertDate($dateString, $outputFormat = 'Y-m-d')
     {
         $formats = [
             'd/m/y',
@@ -108,7 +117,7 @@ class LibraryClayController extends Controller
         return "Error parsing date: Unrecognized date format";
     }
 
-    static public function isValidNIK($nik)
+    public static function isValidNIK($nik)
     {
         // Cek panjang dan hanya angka
         if (!preg_match('/^\d{16}$/', $nik)) {
@@ -142,7 +151,7 @@ class LibraryClayController extends Controller
     }
 
 
-    static public function updateMaster(array $parmData): string
+    public static function updateMaster(array $parmData): string
     {
         // dd($parmData);
         $connection = DB::connection('db_master');
@@ -256,7 +265,7 @@ class LibraryClayController extends Controller
         }
     }
 
-    static public function callbackSyncMaster(array $parmData): array
+    public static function callbackSyncMaster(array $parmData): array
     {
         // dd(config('MasterCrudConfig.MASTER_DIRECT_EDIT'),$parmData);
         extract($parmData);
@@ -300,7 +309,7 @@ class LibraryClayController extends Controller
     }
 
     /*convert array master index ke key dengan id */
-    static public function getDataSync(array $dataVar,$withTrashed=false): array
+    public static function getDataSync(array $dataVar,$withTrashed=false): array
     {
         extract($dataVar);
         $data_sync_master_count = isset($data_master) ? count($data_master) : 0;
@@ -351,7 +360,7 @@ class LibraryClayController extends Controller
     }
 
     /*convert array master index ke key dengan id */
-    static public function syncLog(array $dataVar): array
+    public static function syncLog(array $dataVar): array
     {
         extract($dataVar);
         if ($log) {
@@ -370,7 +379,7 @@ class LibraryClayController extends Controller
     }
 
     /*convert array master index ke key dengan id */
-    static public function sync_update(array $dataVar): array
+    public static function sync_update(array $dataVar): array
     {
         extract($dataVar);
         $model_lokal = 'Bangsamu\Master\Models\\' . $tabel_lokal;
@@ -414,7 +423,7 @@ class LibraryClayController extends Controller
     }
 
     /*convert array master index ke key dengan id */
-    static public function sync_insert(array $dataVar): array
+    public static function sync_insert(array $dataVar): array
     {
         extract($dataVar);
         $model_lokal = 'Bangsamu\Master\Models\\' . $tabel_lokal;
@@ -447,7 +456,7 @@ class LibraryClayController extends Controller
     }
 
     /*convert array master index ke key dengan id */
-    static public function arrayIndexToId(array $dataVar): array
+    public static function arrayIndexToId(array $dataVar): array
     {
         // $data_array_map_master=[];
         extract($dataVar);
@@ -497,7 +506,7 @@ class LibraryClayController extends Controller
      *
      * @return string berisi nilai ip addres dari client
      */
-    static public function getIp(): string
+    public static function getIp(): string
     {
         if (isset($_SERVER['HTTP_CLIENT_IP']))
             $ipaddress = $_SERVER['HTTP_CLIENT_IP'];
@@ -526,7 +535,7 @@ class LibraryClayController extends Controller
      *
      * @return mix akan return boolean true jika sukses jika gagal akan respod json untuk data errornya
      */
-    static public function validatorCek($request_all, $rules)
+    public static function validatorCek($request_all, $rules)
     {
         $validator = Validator::make($request_all, $rules);
         if ($validator->fails()) {
@@ -542,9 +551,9 @@ class LibraryClayController extends Controller
      *
      * @param error array berisi list data yang error
      *
-     * @return json berisi return dari format static public function setOutput
+     * @return json berisi return dari format public static function setOutput
      */
-    static public function validateError($error = null)
+    public static function validateError($error = null)
     {
         $data['status'] =  'gagal';
         $data['code'] = '400';
@@ -562,7 +571,7 @@ class LibraryClayController extends Controller
      *
      * @return mix respond data dari param type defaultnya json
      */
-    static public function setOutput($respon = null, $type = 'json')
+    public static function setOutput($respon = null, $type = 'json')
     {
         if ($type == 'json') {
             // $return = $respon->{$type}();
@@ -589,7 +598,7 @@ class LibraryClayController extends Controller
      *
      * @return string berisi return status sukses atau gagal dan keterangannya
      */
-    static public function downTabel(string $nama_tabel): string
+    public static function downTabel(string $nama_tabel): string
     {
         $drop_tabel = 'gagal';
 
@@ -623,7 +632,7 @@ class LibraryClayController extends Controller
      *
      * @return array berisi validasi cek [sukses,gagal] dan list daftar api yang sukses
      */
-    static public function routeCek(array $list_route): array
+    public static function routeCek(array $list_route): array
     {
         $total = count($list_route);
         $sukses = 0;
@@ -652,7 +661,7 @@ class LibraryClayController extends Controller
      *
      * @return string berisi return full query yang di dump
      */
-    static public function ExportDatabase(array $tablesToBackup = null, string $backupFilename = null): string
+    public static function ExportDatabase(array $tablesToBackup = null, string $backupFilename = null): string
     {
         $targetTables = [];
         $newLine = "\n";
@@ -736,7 +745,7 @@ class LibraryClayController extends Controller
         return $content;
     }
 
-    static public function monthly_mp_location($date = null, $type = 'data3', $group = "HEAVY-EQUIPMENT")
+    public static function monthly_mp_location($date = null, $type = 'data3', $group = "HEAVY-EQUIPMENT")
     {
         $date = date('Y-m', strtotime($date));
         $data = DB::select("
@@ -761,7 +770,7 @@ class LibraryClayController extends Controller
         return $data;
     }
 
-    static public function monthly_mp_project($date = null, $type = 'data3', $group = "HEAVY-EQUIPMENT")
+    public static function monthly_mp_project($date = null, $type = 'data3', $group = "HEAVY-EQUIPMENT")
     {
         $date = date('Y-m', strtotime($date));
         $data = DB::select("
@@ -786,7 +795,7 @@ class LibraryClayController extends Controller
         return $data;
     }
 
-    static public function monthly_mp($year = null, $month = null)
+    public static function monthly_mp($year = null, $month = null)
     {
         $date = date('Y-m', strtotime($year . '-' . $month));
         $data = DB::select("
@@ -842,7 +851,7 @@ class LibraryClayController extends Controller
     }
 
 
-    static public function monthly_recap($date = null, $type = 'data3', $group = "HEAVY-EQUIPMENT")
+    public static function monthly_recap($date = null, $type = 'data3', $group = "HEAVY-EQUIPMENT")
     {
         $date = date('Y-m', strtotime($date));
         $data = DB::select("
@@ -854,7 +863,7 @@ class LibraryClayController extends Controller
         return $data;
     }
 
-    static public function monthly_condition_status($year = null, $month = null)
+    public static function monthly_condition_status($year = null, $month = null)
     {
 
         $date = date('Y-m', strtotime($year . '-' . $month));
@@ -885,7 +894,7 @@ class LibraryClayController extends Controller
         return $return;
     }
 
-    static public function monthly_utilisation($year = null, $month = null)
+    public static function monthly_utilisation($year = null, $month = null)
     {
 
         $date = date('Y-m', strtotime($year . '-' . $month));
@@ -916,7 +925,7 @@ class LibraryClayController extends Controller
         return $return;
     }
 
-    static public function monthly_task($month = null)
+    public static function monthly_task($month = null)
     {
 
         // $query = "SELECT COLUMN_NAME
@@ -943,7 +952,7 @@ class LibraryClayController extends Controller
         return $return;
     }
 
-    static public function formatBytes($bytes, $precision = 2)
+    public static function formatBytes($bytes, $precision = 2)
     {
         $units = array('B', 'KB', 'MB', 'GB', 'TB');
 
@@ -959,13 +968,13 @@ class LibraryClayController extends Controller
     }
 
 
-    static public function get_config_notif($id)
+    public static function get_config_notif($id)
     {
         $config_notif = NotifConfig::find($id);
         return $config_notif;
     }
 
-    static public function get_group_by_permission()
+    public static function get_group_by_permission()
     {
         /*masih ada bug bekum bisa baca auth harus pakek token*/
         $group = [];
@@ -998,32 +1007,32 @@ class LibraryClayController extends Controller
         return $group_str;
     }
 
-    // static public function checkPermission($permission)
+    // public static function checkPermission($permission)
     // {
     //     $result = auth()->user()->can($permission);
 
     //     return $result;
     // }
 
-    static public function getEmployeeByName($label)
+    public static function getEmployeeByName($label)
     {
         $employee = Employee::select('id', 'name', 'employee_id', 'job_title')->where('name', '=', $label)->first();
         return $employee;
     }
 
-    static public function getProjectByName($label)
+    public static function getProjectByName($label)
     {
         $project = Project::select('id', 'project_name', 'project_code')->where('project_name', '=', $label)->first();
         return $project;
     }
 
-    static public function getProjectById($id)
+    public static function getProjectById($id)
     {
         $project = Project::select('id', 'project_name', 'project_code')->where('id', '=', $id)->first();
         return $project;
     }
 
-    static public function get_filed_toJson($table)
+    public static function get_filed_toJson($table)
     {
         $databaseName = \DB::connection()->getDatabaseName();
 
@@ -1043,7 +1052,7 @@ class LibraryClayController extends Controller
         return $data_json;
     }
 
-    static public function get_enum_values($table, $field)
+    public static function get_enum_values($table, $field)
     {
         $type = DB::select("SHOW COLUMNS FROM {$table} WHERE Field = '{$field}'")[0]->Type;
         preg_match("/^enum\(\'(.*)\'\)$/", $type, $matches);
@@ -1058,7 +1067,7 @@ class LibraryClayController extends Controller
      * $table_list = tabel yang akan di ambil untuk di jadikan enum
      * $field_list = field yang akan dijadikan nilai enum
      */
-    static public function set_enum_values($table, $field, $table_list, $field_list)
+    public static function set_enum_values($table, $field, $table_list, $field_list)
     {
         // dd(set_enum_values('ams_heavy_equipment','asset_type','ams_he_at','description'));
 
@@ -1069,63 +1078,63 @@ class LibraryClayController extends Controller
         return $alter_enum;
     }
 
-    static public function get_location_by_id($id)
+    public static function get_location_by_id($id)
     {
         $data = DB::table('master_locations')->where('id', $id)->first();
 
         return $data;
     }
 
-    static public function get_actions_by_name_filter($search, $group, $filter = 'action')
+    public static function get_actions_by_name_filter($search, $group, $filter = 'action')
     {
         $data = DB::table('ams_actions')->where('action_group', $group)->where($filter, 'like', '%' . $search . '%')->get();
 
         return $data;
     }
 
-    static public function get_actions_by_id($id)
+    public static function get_actions_by_id($id)
     {
         $data = DB::table('ams_actions')->where('id', $id)->first();
 
         return $data;
     }
 
-    static public function get_group()
+    public static function get_group()
     {
         $data = AssetGroup::all();
 
         return $data;
     }
 
-    static public function get_group_by_name($group)
+    public static function get_group_by_name($group)
     {
         $data = DB::table('ams_asset_group')->where('name', $group)->first();
 
         return $data;
     }
 
-    static public function get_actions_by_name($group)
+    public static function get_actions_by_name($group)
     {
         $data = DB::table('ams_actions')->where('action_group', $group)->get();
 
         return $data;
     }
 
-    static public function get_actions_first_by_name($group)
+    public static function get_actions_first_by_name($group)
     {
         $data = DB::table('ams_actions')->where('action', $group)->get();
 
         return $data;
     }
 
-    static public function get_actions_daily_inspection()
+    public static function get_actions_daily_inspection()
     {
         $data = DB::table('ams_actions')->where('action', 'like', 'DAILY-INSPECTION-%')->get();
 
         return $data;
     }
 
-    static public function get_dailyinspection_required_column($table)
+    public static function get_dailyinspection_required_column($table)
     {
         $query = "SELECT COLUMN_NAME
         FROM INFORMATION_SCHEMA.COLUMNS
@@ -1141,7 +1150,7 @@ class LibraryClayController extends Controller
         // return DB::getSchemaBuilder()->getColumnListing($table);
     }
 
-    static public function get_dailyinspection_index_column($table)
+    public static function get_dailyinspection_index_column($table)
     {
         $columns = [
             'added_by',
@@ -1188,19 +1197,19 @@ class LibraryClayController extends Controller
         return $final;
     }
 
-    static public function get_dailyinspection_description_by_field($name)
+    public static function get_dailyinspection_description_by_field($name)
     {
         return DB::table('ams_daily_inspection_helper_table')->select('description')->where('field_name', $name)->first()->description;
     }
 
-    static public function get_actions()
+    public static function get_actions()
     {
         $data = DB::table('ams_actions')->get();
 
         return $data;
     }
 
-    static public function cron_log_changes($request, $model, $changes, $group, $asset_number)
+    public static function cron_log_changes($request, $model, $changes, $group, $asset_number)
     {
 
         unset($changes['updated_at']);
@@ -1222,7 +1231,7 @@ class LibraryClayController extends Controller
         }
     }
 
-    static public function detail_log_changes($request, $model, $original, $group, $data)
+    public static function detail_log_changes($request, $model, $original, $group, $data)
     {
         $changes = [];
 
@@ -1252,7 +1261,7 @@ class LibraryClayController extends Controller
         }
     }
 
-    static public function log_changes($request, $model, $original, $group, $action, $data)
+    public static function log_changes($request, $model, $original, $group, $action, $data)
     {
 
         $action = Actions::find($action);
@@ -1284,7 +1293,7 @@ class LibraryClayController extends Controller
         }
     }
 
-    static public function insert_attachment($files, $model, $group, $action)
+    public static function insert_attachment($files, $model, $group, $action)
     {
         $action = Actions::find($action);
         $group = AssetGroup::find($group);
@@ -1317,7 +1326,7 @@ class LibraryClayController extends Controller
         }
     }
 
-    static public function insert_attachment_gallery_action($files, $model, $group, $action)
+    public static function insert_attachment_gallery_action($files, $model, $group, $action)
     {
         $action = Actions::find($action);
         $group = AssetGroup::find($group);
@@ -1367,7 +1376,7 @@ class LibraryClayController extends Controller
         }
     }
 
-    static public function insert_attachment_gallery($file, $request, $action, $model, $group, $asset_number)
+    public static function insert_attachment_gallery($file, $request, $action, $model, $group, $asset_number)
     {
 
         $return_id = [];
@@ -1409,9 +1418,9 @@ class LibraryClayController extends Controller
         return true;
     }
 
-    static public function deleteFileManager($id) {}
+    public static function deleteFileManager($id) {}
 
-    static public function get_dirty($dirty)
+    public static function get_dirty($dirty)
     {
         $array[0] = $dirty;
 
@@ -1421,7 +1430,7 @@ class LibraryClayController extends Controller
         return $array;
     }
 
-    static public function syncGallery($dir)
+    public static function syncGallery($dir)
     {
         $size = 0;
         $list_file = [];
@@ -1439,7 +1448,7 @@ class LibraryClayController extends Controller
         return $list_file;
     }
 
-    // static public function cekEvent($data)
+    // public static function cekEvent($data)
     // {
     //     /*event git*/
     //     if (isset($data->result['repository']['name']) || isset($data->result['commits'][0]['message']) || isset($data->result['push']['changes'])) {
@@ -1454,7 +1463,7 @@ class LibraryClayController extends Controller
     //     return $data;
     // }
 
-    // static public function gitPull($branch, $message)
+    // public static function gitPull($branch, $message)
     // {
     //     $deploy = str_contains($message, '#deploy');
     //     // dd(1, $action, $branch, $message);
@@ -1482,7 +1491,7 @@ class LibraryClayController extends Controller
     //     return $respond;
     // }
 
-    static public function api_token($data)
+    public static function api_token($data)
     {
         // $token = md5($data . ':' . config('SsoConfig.main.KEY'));
 
@@ -1490,7 +1499,7 @@ class LibraryClayController extends Controller
         return $token;
     }
 
-    static public function validate_token($data, $token)
+    public static function validate_token($data, $token)
     {
         if (!is_string($token) || empty($token)) {
             return false;
@@ -1499,12 +1508,12 @@ class LibraryClayController extends Controller
         return hash_equals($expected, $token);
     }
 
-    static public function convertTableNameToModel($tableName)
+    public static function convertTableNameToModel($tableName)
     {
         return str_replace(' ', '', ucwords(str_replace('_', ' ', $tableName)));
     }
 
-    static public function resolveModelFromSheetSlug($slug)
+    public static function resolveModelFromSheetSlug($slug)
     {
         $className = str_replace(' ', '', ucwords(str_replace('_', ' ', $slug)));
         $modelClass = "Bangsamu\\Master\\Models\\" . $className;
