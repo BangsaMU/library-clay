@@ -25,11 +25,112 @@ use Illuminate\Http\Client\Pool;
 use Illuminate\Support\Facades\Http;
 use setasign\Fpdi\Tcpdf\Fpdi;
 use Bangsamu\Master\Models\Setting;
+use Bangsamu\Master\Models\DashboardSettings;
+use Illuminate\Support\Facades\Config;
 
 Carbon::setLocale('id');
 
 class LibraryClayController extends Controller
 {
+       /**
+     * Get the URL for a menu item.
+     *
+     * @param array $item
+     * @return string
+     */
+    public static function getUrl($item)
+    {
+        // If direct URL is specified, use it
+        if (!empty($item['url'])) {
+            return $item['url'];
+        }
+
+        // If route is specified, generate URL from route
+        if (!empty($item['route'])) {
+            return route($item['route']);
+        }
+
+        // Default to # if neither is specified
+        return '#';
+    }
+
+    /**
+     * Check if the given item is active based on current request.
+     *
+     * @param array $item
+     * @return bool
+     */
+    public static function isActive($item)
+    {
+        // Check if route matches
+        if (!empty($item['route']) && request()->routeIs($item['route'])) {
+            return true;
+        }
+
+        // Check if URL matches (excluding protocol and domain)
+        if (!empty($item['url'])) {
+            // Handle external URLs differently
+            if (filter_var($item['url'], FILTER_VALIDATE_URL)) {
+                return false; // External URLs can't be "active"
+            }
+
+            // For internal URLs, compare the path
+            if (request()->path() === ltrim($item['url'], '/')) {
+                return true;
+            }
+        }
+
+        // Check if explicit "active" pattern matches
+        if (!empty($item['active']) && request()->is($item['active'])) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if a dropdown menu item or any of its children are active.
+     *
+     * @param array $item
+     * @return bool
+     */
+    public static function isDropdownActive($item)
+    {
+        if (self::isActive($item)) {
+            return true;
+        }
+
+        if (!empty($item['children'])) {
+            foreach ($item['children'] as $child) {
+                if (!empty($child['children'])) {
+                    if (self::isDropdownActive($child)) {
+                        return true;
+                    }
+                }else if (self::isActive($child)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    // Add this method to your MenuHelper class
+    public static function userHasAnyPermission($item)
+    {
+        if (empty($item['permissions'])) {
+            return false;
+        }
+
+        foreach ($item['permissions'] as $permission) {
+            if (auth()->user()->can($permission)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * Mengganti karakter berbahaya di nama file
      */
@@ -46,6 +147,22 @@ class LibraryClayController extends Controller
             ->get()->pluck('value', 'name');
 
         return $SettingCategory;
+    }
+
+    public static function getDashboardSetting($paramKey,$defValue)
+    {
+        // $DashboardSetting = DashboardSettings::where('key', $paramKey)
+        //     ->get()->pluck('value', 'name');
+
+        // return $SettingCategory??$defValue;
+                // Check config first (in case it was overridden)
+        if (strpos($paramKey, '.') !== false && Config::has($paramKey)) {
+            return Config::get($paramKey);
+        }
+
+        // Get from settings
+        $setting = DashboardSettings::where('key', $paramKey)->first();
+        return $setting ? $setting->value : $defValue;
     }
 
     // Contoh penggunaan
