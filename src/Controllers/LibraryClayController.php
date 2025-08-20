@@ -32,6 +32,21 @@ Carbon::setLocale('id');
 
 class LibraryClayController extends Controller
 {
+
+    public static function getCountVisitor()
+    {
+        // Menghitung total pengunjung
+        $totalVisitors = DB::table('visitors')->count();
+
+        // Menghitung pengunjung unik berdasarkan IP
+        $uniqueVisitors = DB::table('visitors')->distinct('ip')->count('ip');
+
+        return [
+            'totalVisitors' => $totalVisitors,
+            'uniqueVisitors' => $uniqueVisitors,
+        ];
+    }
+
        /**
      * Get the URL for a menu item.
      *
