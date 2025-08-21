@@ -5,6 +5,7 @@ namespace Bangsamu\LibraryClay;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Contracts\Http\Kernel;
 use Bangsamu\LibraryClay\Middleware\ForceAppUrl;
+use Illuminate\Support\Facades\Log;
 
 class LibraryClayPackageServiceProvider extends ServiceProvider
 {
@@ -27,6 +28,8 @@ class LibraryClayPackageServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Log::info('LibraryClayPackageServiceProvider boot called');
+
         //
         $this->loadConfig();
         $this->loadRoutesFrom(__DIR__ . '/routes.php');

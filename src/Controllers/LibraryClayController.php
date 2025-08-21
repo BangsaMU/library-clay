@@ -41,9 +41,16 @@ class LibraryClayController extends Controller
         // Menghitung pengunjung unik berdasarkan IP
         $uniqueVisitors = DB::table('visitors')->distinct('ip')->count('ip');
 
+        // hitung pengunjung unik per hari ini
+        $uniqueVisitorsToday = DB::table('visitors')
+            ->whereDate('created_at', today())
+            ->distinct('ip')
+            ->count('ip');
+
         return [
             'totalVisitors' => $totalVisitors,
             'uniqueVisitors' => $uniqueVisitors,
+            'uniqueVisitorsToday' => $uniqueVisitorsToday,
         ];
     }
 
