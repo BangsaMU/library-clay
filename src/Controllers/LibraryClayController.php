@@ -1175,7 +1175,7 @@ class LibraryClayController extends Controller
     {
         $databaseName = DB::connection($databaseConfig)->getDatabaseName();
 
-        $data_json = DB::select("
+        $data_json =  DB::connection($databaseConfig)->select("
                         with vt_filed_tabel as(
                             SELECT
                             `COLUMN_NAME`
