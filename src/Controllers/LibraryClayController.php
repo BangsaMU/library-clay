@@ -1171,9 +1171,9 @@ class LibraryClayController extends Controller
         return $project;
     }
 
-    public static function get_filed_toJson($table)
+    public static function get_filed_toJson($table,$databaseConfig=null)
     {
-        $databaseName = \DB::connection()->getDatabaseName();
+        $databaseName = DB::connection($databaseConfig)->getDatabaseName();
 
         $data_json = DB::select("
                         with vt_filed_tabel as(
