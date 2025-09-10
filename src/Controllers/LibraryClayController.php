@@ -543,7 +543,7 @@ class LibraryClayController extends Controller
                     // dd(1,!empty($cek_diff),$cek_diff);
                     // $data = @$data_array_map_master[$keyId];
                     // dd($data);
-                    $origin = $model_lokal::where('id', $keyId);
+                    $origin = $model_lokal::withTrashed()->where('id', $keyId);//bug fix data hapus juga munculkan
                     // $origin = Employee::where('id', $keyId);
                     $origin_data = $origin->first()->toArray();
                     $origin_change = array_intersect_key($origin_data, $cek_diff);
