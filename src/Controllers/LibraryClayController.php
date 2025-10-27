@@ -27,6 +27,7 @@ use setasign\Fpdi\Tcpdf\Fpdi;
 use Bangsamu\Master\Models\Setting;
 use Bangsamu\Master\Models\DashboardSettings;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Route;
 
 Carbon::setLocale('id');
 
@@ -69,7 +70,13 @@ class LibraryClayController extends Controller
 
         // If route is specified, generate URL from route
         if (!empty($item['route'])) {
-            return route($item['route']);
+            $routeName = $item['route'];
+            if (Route::has($routeName)) {
+                return route($routeName);
+            }
+
+            Log::warning('sys route Not Found:: ' . $routeName );
+            return "#routeNotFound({$routeName})";
         }
 
         // Default to # if neither is specified
