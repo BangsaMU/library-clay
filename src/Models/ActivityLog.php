@@ -125,26 +125,27 @@ class ActivityLog extends Model
      */
     protected static function getClientPublicIp($request): string
     {
-        // Ambil dari header reverse proxy / load balancer jika ada
-        $ip = $request->header('CF-Connecting-IP')
-            ?? $request->header('X-Forwarded-For')
+        // 1️⃣ Ambil IP dari header proxy dulu
+        $ip = $request->header('X-Forwarded-For')
             ?? $request->header('X-Real-IP')
             ?? $request->ip();
 
-        // Jika masih IP lokal (192.x, 10.x, 172.16–31, atau 127.0.0.1)
+        // 2️⃣ Jika IP private, ambil IP publik server (tapi cached)
         if (self::isPrivateIp($ip)) {
-            try {
-                // Aman — HTTPS, hanya return IP publik (tanpa data pribadi)
-                $response = Http::timeout(2)->get('https://api.ipify.org');
-                if ($response->successful()) {
-                    $publicIp = trim($response->body());
-                    if (filter_var($publicIp, FILTER_VALIDATE_IP)) {
-                        return $publicIp;
+            return cache()->remember('server_public_ip', now()->addHours(6), function () {
+                try {
+                    $response = Http::timeout(2)->get('https://api.ipify.org');
+                    if ($response->successful()) {
+                        $publicIp = trim($response->body());
+                        if (filter_var($publicIp, FILTER_VALIDATE_IP)) {
+                            return $publicIp;
+                        }
                     }
+                } catch (\Exception $e) {
+                    Log::warning('Gagal ambil IP publik: '.$e->getMessage());
                 }
-            } catch (\Exception $e) {
-                Log::warning('Gagal mengambil IP publik: ' . $e->getMessage());
-            }
+                return '0.0.0.0';
+            });
         }
 
         return $ip;
