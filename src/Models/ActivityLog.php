@@ -130,11 +130,26 @@ class ActivityLog extends Model
             ?? $request->header('X-Real-IP')
             ?? $request->ip();
 
-        // 2️⃣ Jika IP private, ambil IP publik server (tapi cached)
+        // 2️⃣ Jika IP private, ambil IP publik server (cache 6 jam)
         if (self::isPrivateIp($ip)) {
             return cache()->remember('server_public_ip', now()->addHours(6), function () {
                 try {
-                    $response = Http::timeout(2)->get('https://api.ipify.org');
+                    // 🌩️ Coba ambil dari Cloudflare
+                    $response = Http::timeout(3)->get('https://cloudflare.com/cdn-cgi/trace');
+
+                    if ($response->successful()) {
+                        preg_match('/ip=([0-9a-fA-F:.]+)/', $response->body(), $matches);
+                        if (!empty($matches[1]) && filter_var($matches[1], FILTER_VALIDATE_IP)) {
+                            return $matches[1];
+                        }
+                    }
+                } catch (\Exception $e) {
+                    Log::warning('Gagal ambil IP publik dari Cloudflare: ' . $e->getMessage());
+                }
+
+                // 🌍 Fallback ke ipify jika Cloudflare gagal
+                try {
+                    $response = Http::timeout(3)->get('https://api.ipify.org');
                     if ($response->successful()) {
                         $publicIp = trim($response->body());
                         if (filter_var($publicIp, FILTER_VALIDATE_IP)) {
@@ -142,14 +157,17 @@ class ActivityLog extends Model
                         }
                     }
                 } catch (\Exception $e) {
-                    Log::warning('Gagal ambil IP publik: '.$e->getMessage());
+                    Log::warning('Gagal ambil IP publik dari ipify: ' . $e->getMessage());
                 }
+
+                // 🚫 Jika semua gagal
                 return '0.0.0.0';
             });
         }
 
         return $ip;
     }
+
 
     /**
      * Cek apakah IP adalah IP lokal/private
