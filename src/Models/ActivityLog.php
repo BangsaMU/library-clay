@@ -132,7 +132,6 @@ class ActivityLog extends Model
 
         // 2️⃣ Jika IP private, ambil IP publik server (cache 6 jam)
         if (self::isPrivateIp($ip)&&config('activitylog.trace_ip')==TRUE) {
-        if (self::isPrivateIp($ip)) {
             return cache()->remember('server_public_ip', now()->addHours(6), function () {
                 try {
                     // 🌩️ Coba ambil dari Cloudflare
