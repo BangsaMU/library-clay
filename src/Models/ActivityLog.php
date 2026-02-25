@@ -14,7 +14,7 @@ class ActivityLog extends Model
 {
     use HasFactory;
 
-    public $table = "activity_logs";
+    protected $table = "activity_logs";
     protected $guarded = [];
 
 

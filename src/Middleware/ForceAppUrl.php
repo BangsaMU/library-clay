@@ -9,7 +9,9 @@ class ForceAppUrl
 {
     public function handle(Request $request, Closure $next)
     {
-        Log::info('[ForceAppUrl] Middleware aktif.');
+        if (config('app.env') === 'debug') {
+            Log::info('[ForceAppUrl] Middleware aktif.');
+        }
 
         $urlParts = parse_url(config('app.url'));
         $appHost = $urlParts['host'] ?? null;
@@ -37,7 +39,9 @@ class ForceAppUrl
                 str_contains($requestHost, $allowed) ||
                 preg_match('/^192\.168\./', $requestHost)
             ) {
-                Log::info("[ForceAppUrl] Access allowed for host: {$requestHost}");
+                if (config('app.env') === 'debug') {
+                    Log::info("[ForceAppUrl] Access allowed for host: {$requestHost}");
+                }
                 return $next($request);
             }
         }

@@ -28,8 +28,9 @@ class LibraryClayPackageServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        Log::info('LibraryClayPackageServiceProvider boot called');
-
+        if (config('app.env') === 'debug') {
+            Log::info('LibraryClayPackageServiceProvider boot called');
+        }
         //
         $this->loadConfig();
         $this->loadRoutesFrom(__DIR__ . '/routes.php');
