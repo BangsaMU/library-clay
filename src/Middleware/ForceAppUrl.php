@@ -4,6 +4,7 @@ namespace Bangsamu\LibraryClay\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Laravel\Telescope\Telescope;
 
 class ForceAppUrl
 {
@@ -11,6 +12,21 @@ class ForceAppUrl
     {
         if (config('app.env') === 'debug') {
             Log::info('[ForceAppUrl] Middleware aktif.');
+            try {
+                if (config('telescope.enabled')) {
+                    Log::info('Telescope diaktifkan dalam konfigurasi.');
+                    if (Telescope::isRecording()) {
+                        // Telescope sedang aktif mencatat data
+                        Log::info('Telescope merekam data.');
+                    } else {
+                        Log::info('Telescope tidak merekam data.');
+                    }
+                } else {
+                    Log::info('Telescope tidak diaktifkan dalam konfigurasi.');
+                }        
+            } catch (\Throwable $e) {
+                Log::info('Telescope ERROR: ' . $e->getMessage());
+            }
         }
 
         $urlParts = parse_url(config('app.url'));

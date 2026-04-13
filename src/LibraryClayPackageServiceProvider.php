@@ -3,9 +3,11 @@
 namespace Bangsamu\LibraryClay;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Http\Kernel;
 use Bangsamu\LibraryClay\Middleware\ForceAppUrl;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Log; 
+ 
 
 class LibraryClayPackageServiceProvider extends ServiceProvider
 {
@@ -31,6 +33,34 @@ class LibraryClayPackageServiceProvider extends ServiceProvider
         if (config('app.env') === 'debug') {
             Log::info('LibraryClayPackageServiceProvider boot called');
         }
+        
+
+        $this->app->booted(function () {
+            try {
+                // 1. Cek apakah Telescope aktif di config
+                // 2. Cek apakah Artisan Command Telescope tersedia (menghindari error jika package tidak diinstall)
+                if (config('telescope.enabled') && \Illuminate\Support\Facades\Artisan::all()['telescope:prune'] ?? false) {
+                    
+                    $schedule = $this->app->make(Schedule::class);
+
+                    $schedule->command('telescope:prune --hours=720')
+                        ->monthly()
+                        ->onOneServer()
+                        ->runInBackground()
+                        ->onSuccess(function () {
+                            Log::info("[LibraryClay] Telescope Prune BERHASIL dijalankan.");
+                        })
+                        ->onFailure(function () {
+                            Log::error("[LibraryClay] Telescope Prune GAGAL dijalankan.");
+                        });
+                }
+            } catch (\Throwable $e) {
+                // Diamkan agar tidak merusak aplikasi user jika gagal registrasi schedule
+                Log::warning("[LibraryClay] Gagal mendaftarkan Telescope Prune: " . $e->getMessage());
+            }
+        });
+
+
         //
         $this->loadConfig();
         $this->loadRoutesFrom(__DIR__ . '/routes.php');

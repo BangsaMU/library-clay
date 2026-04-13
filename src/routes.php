@@ -28,6 +28,13 @@ Route::get('getIp', function () {
 });
 
 
+// ─── TEST MAIL ROUTES (diagnosa email) ───────────────────────────
+
+Route::middleware(['web','auth'])->prefix('test-mail')->name('test-mail.')->group(function () {
+    Route::get('diagnose', [\Bangsamu\LibraryClay\Controllers\LibraryClayMailController::class, 'diagnose'])->name('diagnose');
+    Route::get('send-sync', [\Bangsamu\LibraryClay\Controllers\LibraryClayMailController::class, 'testSendSync'])->name('send-sync');
+    Route::get('send-env', [\Bangsamu\LibraryClay\Controllers\LibraryClayMailController::class, 'testSendEnv'])->name('send-env');
+});
 
 Route::middleware(['web'])->group(function () {
 
