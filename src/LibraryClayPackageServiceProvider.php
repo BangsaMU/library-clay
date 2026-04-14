@@ -7,6 +7,7 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Http\Kernel;
 use Bangsamu\LibraryClay\Middleware\ForceAppUrl;
 use Illuminate\Support\Facades\Log; 
+use Illuminate\Support\Facades\Artisan;
  
 
 class LibraryClayPackageServiceProvider extends ServiceProvider
@@ -35,30 +36,30 @@ class LibraryClayPackageServiceProvider extends ServiceProvider
         }
         
 
+
         $this->app->booted(function () {
             try {
-                // 1. Cek apakah Telescope aktif di config
-                // 2. Cek apakah Artisan Command Telescope tersedia (menghindari error jika package tidak diinstall)
-                if (config('telescope.enabled') && \Illuminate\Support\Facades\Artisan::all()['telescope:prune'] ?? false) {
+                // Ambil semua command yang terdaftar secara aman
+                $commands = Artisan::all();
+
+                // 1. Cek config aktif
+                // 2. Cek apakah key 'telescope:prune' ada di dalam array commands
+                if (config('telescope.enabled') && isset($commands['telescope:prune'])) {
                     
                     $schedule = $this->app->make(Schedule::class);
-
+                    
                     $schedule->command('telescope:prune --hours=720')
                         ->monthly()
                         ->onOneServer()
-                        ->runInBackground()
-                        ->onSuccess(function () {
-                            Log::info("[LibraryClay] Telescope Prune BERHASIL dijalankan.");
-                        })
-                        ->onFailure(function () {
-                            Log::error("[LibraryClay] Telescope Prune GAGAL dijalankan.");
-                        });
+                        ->runInBackground();
+                        
+                    Log::info("[LibraryClay] Telescope prune berhasil dijadwalkan.");
                 }
             } catch (\Throwable $e) {
-                // Diamkan agar tidak merusak aplikasi user jika gagal registrasi schedule
-                Log::warning("[LibraryClay] Gagal mendaftarkan Telescope Prune: " . $e->getMessage());
+                Log::warning("[LibraryClay] Gagal mendaftarkan telescope prune: " . $e->getMessage());
             }
         });
+
 
 
         //

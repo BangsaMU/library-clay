@@ -4,7 +4,7 @@ namespace Bangsamu\LibraryClay\Controllers;
 
 use App\Http\Controllers\Controller;
 
-use Bangsamu\Master\Models\Setting;
+use Bangsamu\Master\Models\DashboardSettings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
@@ -40,7 +40,7 @@ class LibraryClayMailController extends Controller
 
         // ─── 2. CEK DB CONFIG (dashboard_settings) ──────────
         try {
-            $dbConfig = Setting::where('group', 'mail')->pluck('value', 'key')->toArray();
+            $dbConfig = DashboardSettings::where('group', 'mail')->pluck('value', 'key')->toArray();
             $results['db_config'] = $dbConfig;
 
             // Cek apakah password ter-enkripsi
@@ -125,7 +125,7 @@ class LibraryClayMailController extends Controller
 
         try {
             // ─── Step 1: Load DB config (sama seperti SendEmailJob) ──────
-            $mailConfig = Setting::where('group', 'mail')->pluck('value', 'key')->toArray();
+            $mailConfig = DashboardSettings::where('group', 'mail')->pluck('value', 'key')->toArray();
             $steps[] = '✅ Step 1: DB config loaded — host='
                 .($mailConfig['mail.host'] ?? 'null')
                 .', port='.($mailConfig['mail.port'] ?? 'null')
