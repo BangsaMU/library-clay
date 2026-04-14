@@ -232,7 +232,7 @@ class LibraryClayMailController extends Controller
 
             // ─── Step 4: Kirim test email ────────────────────────────────
             Mail::mailer('smtp')->raw(
-                "Ini adalah test email dari Warehouse App.\n\nDikirim pada: ".now()->toDateTimeString()
+                "Ini adalah test email dari ".config('app.name').".\n\nDikirim pada: ".now()->toDateTimeString()
                 ."\nHost: ".$mailConfig['mail.host'].':'.$mailConfig['mail.port']
                 ."\nPublic IP: ".$publicIp
                 ."\nTrace ID: ".$traceId,
