@@ -54,7 +54,7 @@ class LibraryClayPackageServiceProvider extends ServiceProvider
                         $schedule = $this->app->make(\Illuminate\Console\Scheduling\Schedule::class);
 
                         $schedule->command('telescope:prune --hours=720')
-                            ->everyMinute() //  ->daily() atau ->monthly() sesuai kebutuhan
+                            ->daily() //  everyMinute() ->daily() atau ->monthly() sesuai kebutuhan
                             ->onOneServer()
                             ->runInBackground()
                             ->onSuccess(function () {
