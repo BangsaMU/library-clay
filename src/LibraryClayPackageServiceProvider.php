@@ -36,27 +36,42 @@ class LibraryClayPackageServiceProvider extends ServiceProvider
         }
         
 
-
         $this->app->booted(function () {
             try {
-                // Ambil semua command yang terdaftar secara aman
-                $commands = Artisan::all();
+                $cacheKey = 'libraryclay_telescope_prune_registered_' . date('Y-m-d');
+
+                // Jika hari ini sudah didaftarkan, langsung keluar/return
+                if (\Illuminate\Support\Facades\Cache::has($cacheKey)&&!$this->app->runningInConsole()) {
+                    return;
+                }
 
                 // 1. Cek config aktif
-                // 2. Cek apakah key 'telescope:prune' ada di dalam array commands
-                if (config('telescope.enabled') && isset($commands['telescope:prune'])) {
-                    
-                    $schedule = $this->app->make(Schedule::class);
-                    
-                    $schedule->command('telescope:prune --hours=720')
-                        ->monthly()
-                        ->onOneServer()
-                        ->runInBackground();
-                        
-                    Log::info("[LibraryClay] Telescope prune berhasil dijadwalkan.");
+                if (config('telescope.enabled')) {
+                    $commands = \Illuminate\Support\Facades\Artisan::all();
+
+                    // 2. Cek apakah command telescope:prune tersedia
+                    if (isset($commands['telescope:prune'])) {
+                        $schedule = $this->app->make(\Illuminate\Console\Scheduling\Schedule::class);
+
+                        $schedule->command('telescope:prune --hours=720')
+                            ->everyMinute() //  ->daily() atau ->monthly() sesuai kebutuhan
+                            ->onOneServer()
+                            ->runInBackground()
+                            ->onSuccess(function () {
+                                \Log::info('Telescope pruning berhasil dijalankan.');
+                            })
+                            ->onFailure(function () {
+                                \Log::error('Telescope pruning gagal!');
+                            });
+
+                        // Simpan ke cache agar hit berikutnya di hari yang sama tidak menjalankan blok ini
+                        \Illuminate\Support\Facades\Cache::put($cacheKey, true, now()->addDay());
+
+                        \Illuminate\Support\Facades\Log::info("[LibraryClay] Telescope prune didaftarkan (Sekali sehari).");
+                    }
                 }
             } catch (\Throwable $e) {
-                Log::warning("[LibraryClay] Gagal mendaftarkan telescope prune: " . $e->getMessage());
+                \Illuminate\Support\Facades\Log::warning("[LibraryClay] Gagal mendaftarkan telescope prune: " . $e->getMessage());
             }
         });
 
