@@ -8,6 +8,7 @@ use Bangsamu\Master\Models\ReportNumberFormat;
 use Bangsamu\Master\Models\SequenceNumbers;
 use App\Models\WarehouseFormRequest;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class RequisitionNumberService
 {
@@ -48,6 +49,7 @@ class RequisitionNumberService
             );
         }
         // dd($squence_batch);
+        log::info("Generated formatNumber type_id: {$type_id} sequence batch: {$squence_batch} param: ".json_encode($param));
 
         // Ambil data kalkulasi
         $calculation = $this->calculateNextNumber($squence_batch);
@@ -61,11 +63,54 @@ class RequisitionNumberService
         $paddedNumber = str_pad($calculation['next_sequence'], 4, '0', STR_PAD_LEFT);
 
         // update placeholder sequence
-        $replacements = array_merge([
+        // 1. Definisikan pemetaan tanggal secara dinamis
+        $dateReplacements = [
+            'dd'   => date('d'),          // 01 - 31
+            'mm'   => date('m'),          // 01 - 12
+            'MM'   => date('M'),          // Jan - Dec
+            'yy'   => date('y'),          // 25
+            'YYYY' => date('Y'),          // 2025
+            'year' => $shortYear,         // Alias untuk fallback format lama
             'type_code' => $type_code,
-            'year' => $shortYear,
             'sequence' => $paddedNumber,
-        ], $param);
+        ];
+
+
+        // Ambil Custom Replacements dari Database (Tabel dashboard_settings)
+        $dbSettings = DB::table('dashboard_settings')
+            ->where('group', 'report_number_format')
+            ->pluck('value', 'key') // Langsung ambil pair key => value
+            ->toArray();
+
+        $dbReplacements = [];
+ 
+        
+        
+
+
+        foreach ($dbSettings as $key => $value) {
+            if (function_exists($value)) {
+                try {
+                    $dbReplacements[$key] = $value(); 
+                } catch (\Exception $e) {
+                    // Jika fungsi ada tapi gagal eksekusi
+                    \Log::error("Gagal mengeksekusi helper [{$value}] untuk placeholder {{$key}}: " . $e->getMessage());
+                    // Jangan masukkan ke dbReplacements agar tetap render mentah {key}
+                }
+            } else {
+                // LOG ERROR: Helper tidak ditemukan
+                \Log::warning("Helper fungsi [{$value}()] tidak ditemukan untuk placeholder {{$key}} di dashboard_settings.");
+                
+                // Opsional: Jika value di DB bukan fungsi tapi teks biasa, 
+                // Anda bisa memutuskan ingin menampilkannya atau tidak.
+                // Jika ingin tetap render mentah {project}, jangan masukkan ke array.
+            }
+        }
+
+
+        // 2. Gabungkan dengan parameter tambahan ($param) dari user/sistem
+        $replacements = array_merge($dateReplacements, $param ?? []);
+        log::info('Replacements for number formatting', $replacements);
 
         $formatted = preg_replace_callback(
             '/\{(\w+)\}/',
@@ -115,7 +160,7 @@ class RequisitionNumberService
      *   ];
      *  // dd($requisition);
      *  // Panggil service menggunakan helper app()
-     *  $numberService = app(\App\Services\RequisitionNumberService::class);
+     *  $numberService = app(\Bangsamu\LibraryClay\Services\RequisitionNumberService::class);
      *  $codeNumber = $numberService->generate($requisition,1);
      *  dd(1,$codeNumber);
      *
@@ -130,7 +175,8 @@ class RequisitionNumberService
         // $calculation = $this->calculateNextNumber($type);
 
         $squence_batch = null;
-        $calculation = $this->formatNumber($type_id, $squence_batch, ['project' => 'MEI']);
+        // $calculation = $this->formatNumber($type_id, $squence_batch, ['project' => 'MEI']); // misal ada kirim param project
+        $calculation = $this->formatNumber($type_id, $squence_batch, []);
         // $nextCodeNumber = $this->predictNext($type_id);
         //  $calculation = $this->calculateNextNumber($formatted);
         $nextSequenceNumber = $calculation['next_sequence'];
