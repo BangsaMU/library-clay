@@ -147,7 +147,13 @@ class LibraryClayController extends Controller
     // Add this method to your MenuHelper class
     public static function userHasAnyPermission($item)
     {
+        // 1. Jika item tidak butuh permission, langsung kembalikan false (atau true tergantung logika menu Anda)
         if (empty($item['permissions'])) {
+            return false;
+        }
+
+        // 2. JIKA USER BELUM LOGIN, langsung kembalikan false agar tidak error
+        if (!auth()->check()) {
             return false;
         }
 
