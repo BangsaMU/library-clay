@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
-use Carbon\Carbon; 
+use Illuminate\Support\Carbon;
 Carbon::setLocale('id');
 
 class LibraryClayMailController extends Controller

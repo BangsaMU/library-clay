@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use Carbon\Carbon;
 use App\Http\Controllers\SessionController;
 use App\Models\Email;
 use App\Models\Changes;
@@ -28,6 +27,7 @@ use Bangsamu\Master\Models\Setting;
 use Bangsamu\Master\Models\DashboardSettings;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Carbon;
 
 Carbon::setLocale('id');
 
@@ -305,7 +305,18 @@ class LibraryClayController extends Controller
 
     public static function updateMaster(array $parmData): string
     {
+
+        // Format ulang created_at jika ada
+        if (!empty($parmData['sync_row']['created_at'])) {
+            $parmData['sync_row']['created_at'] = Carbon::parse($parmData['sync_row']['created_at'])->toDateTimeString();
+        }
+
+        // Format ulang updated_at jika ada
+        if (!empty($parmData['sync_row']['updated_at'])) {
+            $parmData['sync_row']['updated_at'] = Carbon::parse($parmData['sync_row']['updated_at'])->toDateTimeString();
+        }
         // dd($parmData);
+
         $connection = DB::connection('db_master');
 
         if (!Schema::connection('db_master')->hasTable($parmData['sync_tabel'])) {
