@@ -1654,11 +1654,14 @@ class LibraryClayController extends Controller
     //     return $respond;
     // }
 
-    public static function api_token($data)
+    public static function api_token($data = '')
     {
         // $token = md5($data . ':' . config('SsoConfig.main.KEY'));
 
-        $token = hash_hmac('sha256', $data, config('SsoConfig.main.KEY'));
+        $dataStr = (string) ($data ?? '');
+        $key = (string) (config('SsoConfig.main.KEY') ?? '');
+
+        $token = hash_hmac('sha256', $dataStr, $key);
         return $token;
     }
 
@@ -1667,7 +1670,10 @@ class LibraryClayController extends Controller
         if (!is_string($token) || empty($token)) {
             return false;
         }
-        $expected = hash_hmac('sha256', $data, config('SsoConfig.main.KEY'));
+        $dataStr = (string) ($data ?? '');
+        $key = (string) (config('SsoConfig.main.KEY') ?? '');
+
+        $expected = hash_hmac('sha256', $dataStr, $key);
         return hash_equals($expected, $token);
     }
 
