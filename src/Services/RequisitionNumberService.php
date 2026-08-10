@@ -54,11 +54,15 @@ class RequisitionNumberService
         return self::DEFAULT_SEQUENCE_PAD;
     }
 
-    public function formatNumber(int $type_id, $squence_batch, array $param = []): array
+    public function formatNumber(int $type_id, $squence_batch, array $param = [], ?int $objectId = null): array
     {
         $paddedNumber = null;
-        $fullYear = date('Y'); // e.g., 2025
+        $fullYear = (int) date('Y'); // e.g., 2025
         $shortYear = date('y'); // e.g., 25
+
+        if (is_null($objectId)) {
+            $objectId = isset($param['object_id']) ? (int) $param['object_id'] : (isset($param['id']) ? (int) $param['id'] : null);
+        }
 
         $RequisitionType = RequisitionType::find($type_id);
         $type_code = $RequisitionType->code ?? 0;
@@ -85,11 +89,30 @@ class RequisitionNumberService
 
         log::info("Generated formatNumber type_id: {$type_id} sequence batch: {$squence_batch} param: " . json_encode($param));
 
-        // Ambil data kalkulasi
-        $calculation = $this->calculateNextNumber($squence_batch);
+        $existingSequence = null;
+        if ($objectId > 0) {
+            $existingSequence = SequenceNumbers::where('object_id', $objectId)
+                ->where('type', $squence_batch)
+                ->where('year', $fullYear)
+                ->first();
+        }
+
+        if ($existingSequence) {
+            $nextSeq = (int) $existingSequence->sequence_number;
+            $calculation = [
+                'next_sequence' => $nextSeq,
+                'full_year' => $fullYear,
+                'short_year' => $shortYear,
+                'squence_batch' => $squence_batch,
+            ];
+        } else {
+            // Ambil data kalkulasi
+            $calculation = $this->calculateNextNumber($squence_batch);
+            $nextSeq = $calculation['next_sequence'];
+        }
 
         $paddedNumber = str_pad(
-            (string) $calculation['next_sequence'],
+            (string) $nextSeq,
             $this->sequenceWidth($format),
             '0',
             STR_PAD_LEFT,
@@ -104,7 +127,7 @@ class RequisitionNumberService
             'YYYY' => date('Y'),          // 2025
             'year' => $shortYear,         // Alias untuk fallback format lama
             'type_code' => $type_code,
-            'sequence' => $calculation['next_sequence'],
+            'sequence' => $nextSeq,
         ];
 
         // Ambil Custom Replacements dari Database (Tabel dashboard_settings)
@@ -137,7 +160,7 @@ class RequisitionNumberService
             'type_code' => $type_code,
             'calculation' => $calculation,
             'squence_batch' => $squence_batch,
-            'next_sequence' => $calculation['next_sequence'],
+            'next_sequence' => $nextSeq,
             'full_year' => $fullYear,
             'short_year' => $shortYear,
             'paddedNumber' => $paddedNumber,
@@ -149,15 +172,16 @@ class RequisitionNumberService
      * Predicts the next available number without saving it.
      * Safe to use for display purposes on a form.
      */
-    public function predictNext(string $type_id, array $param = []): string
+    public function predictNext(string $type_id, array $param = [], ?int $objectId = null): string
     {
         $squence_batch = null;
         $defaultParams = [
             'project' => 'MEI',
-            // 'source' => 'SRC',
-            // 'department' => 'DEPT',
         ];
-        return $this->formatNumber($type_id, $squence_batch, array_merge($defaultParams, $param))['formatted'];
+        if (is_null($objectId)) {
+            $objectId = isset($param['object_id']) ? (int) $param['object_id'] : (isset($param['id']) ? (int) $param['id'] : null);
+        }
+        return $this->formatNumber((int) $type_id, $squence_batch, array_merge($defaultParams, $param), $objectId)['formatted'];
     }
 
     /**
@@ -165,39 +189,105 @@ class RequisitionNumberService
      */
     public function generate($formRequest, int $type_id, array $param = []): string
     {
-        $squence_batch = null;
-        $defaultParams = [
-            'project' => 'MEI',
-            // 'source' => 'SRC',
-            // 'department' => 'DEPT',
-        ];
-        $calculation = $this->formatNumber($type_id, $squence_batch, array_merge($defaultParams, $param));
-
-        $nextSequenceNumber = $calculation['next_sequence'];
-        $type = $calculation['squence_batch'];
-        $year = $calculation['full_year'];
-
-        $attributes = [
-            'object_id' => $formRequest->id,
-            'type'      => $type,
-            'year'      => $year,
-        ];
-
-        $values = [
-            'sequence_number' => $nextSequenceNumber,
-            'created_at'      => now(),
-            'updated_at'      => now(),
-        ];
-
-        SequenceNumbers::updateOrInsert($attributes, $values);
-
-        Log::info('SequenceNumber generated and saved successfully.', [
-            'search_attributes' => $attributes,
-            'saved_values'      => $values,
-            'formatted_result'  => $calculation['formatted'],
+        Log::info('generate SequenceNumber:', [
+            'formRequest' => $formRequest,
+            'type_id'      => $type_id,
+            'param'        => $param,
         ]);
 
-        return $calculation['formatted'];
+        $defaultParams = [
+            'project' => 'MEI',
+        ];
+        $mergedParams = array_merge($defaultParams, $param);
+
+        $objectId = (int) ($formRequest->id ?? 0);
+        $fullYear = (int) date('Y');
+
+        $RequisitionType = RequisitionType::find($type_id);
+        $type_code = $RequisitionType->code ?? 0;
+        $format = ReportNumberFormat::where('type_id', $type_id)->value('format_string') ?? '{type_code}-{year}-{sequence}';
+
+        $batchFormat = $this->resolve($format, array_merge([
+            'type_id'   => $type_id,
+            'type_code' => $type_code,
+            'year'      => date('y'),
+        ], $mergedParams));
+
+        $existingSequence = null;
+        if ($objectId > 0) {
+            $existingSequence = SequenceNumbers::where('object_id', $objectId)
+                ->where('type', $batchFormat)
+                ->where('year', $fullYear)
+                ->first();
+        }
+
+        if ($existingSequence) {
+            $nextSequenceNumber = (int) $existingSequence->sequence_number;
+        } else {
+            $maxSeq = SequenceNumbers::where('type', $batchFormat)
+                ->where('year', $fullYear)
+                ->max('sequence_number');
+            $nextSequenceNumber = ($maxSeq ?? 0) + 1;
+
+            if ($objectId > 0) {
+                SequenceNumbers::updateOrInsert(
+                    ['object_id' => $objectId],
+                    [
+                        'type'            => $batchFormat,
+                        'year'            => $fullYear,
+                        'sequence_number' => $nextSequenceNumber,
+                        'updated_at'      => now(),
+                        'created_at'      => $existingSequence->created_at ?? now(),
+                    ]
+                );
+            }
+        }
+
+        $paddedNumber = str_pad(
+            (string) $nextSequenceNumber,
+            $this->sequenceWidth($format),
+            '0',
+            STR_PAD_LEFT
+        );
+
+        $dateReplacements = [
+            'dd'        => date('d'),
+            'mm'        => date('m'),
+            'MM'        => date('M'),
+            'yy'        => date('y'),
+            'YYYY'      => date('Y'),
+            'year'      => date('y'),
+            'type_code' => $type_code,
+            'sequence'  => $nextSequenceNumber,
+        ];
+
+        $dbSettings = DB::table('dashboard_settings')
+            ->where('group', 'report_number_format')
+            ->pluck('value', 'key')
+            ->toArray();
+
+        $dbReplacements = [];
+        foreach ($dbSettings as $key => $value) {
+            if (function_exists($value)) {
+                try {
+                    $dbReplacements[$key] = $value($mergedParams);
+                } catch (\Exception $e) {
+                    Log::error("Gagal helper [{$value}]: " . $e->getMessage());
+                }
+            }
+        }
+
+        $replacements = array_merge($dateReplacements, $dbReplacements, $mergedParams);
+        $formatted = $this->resolve($format, $replacements);
+
+        Log::info('generate SequenceNumber: generated and saved successfully.', [
+            'object_id'        => $objectId,
+            'batch'            => $batchFormat,
+            'sequence_number'  => $nextSequenceNumber,
+            'formatted_result' => $formatted,
+        ]);
+
+        return $formatted;
     }
 
     /**
