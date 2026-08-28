@@ -2,11 +2,10 @@
 
 namespace Bangsamu\LibraryClay\Services;
 
-use App\Models\Requisition; 
-use Bangsamu\Master\Models\RequisitionType;
+use App\Models\Requisition;
 use Bangsamu\Master\Models\ReportNumberFormat;
+use Bangsamu\Master\Models\RequisitionType;
 use Bangsamu\Master\Models\SequenceNumbers;
-use App\Models\WarehouseFormRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -26,7 +25,7 @@ class RequisitionNumberService
             function ($matches) use ($replacements) {
                 $key = $matches[1];
 
-                if (!array_key_exists($key, $replacements)) {
+                if (! array_key_exists($key, $replacements)) {
                     return $matches[0];
                 }
 
@@ -71,7 +70,7 @@ class RequisitionNumberService
         $format = ReportNumberFormat::where('type_id', $type_id)->value('format_string');
 
         // Default format jika tidak ada di database
-        if (!$format) {
+        if (! $format) {
             $format = '{type_code}-{year}-{sequence}';
         }
 
@@ -87,7 +86,7 @@ class RequisitionNumberService
             $squence_batch = $this->resolve($format, $replacements);
         }
 
-        log::info("Generated formatNumber type_id: {$type_id} sequence batch: {$squence_batch} param: " . json_encode($param));
+        log::info("Generated formatNumber type_id: {$type_id} sequence batch: {$squence_batch} param: ".json_encode($param));
 
         $existingSequence = null;
         if ($objectId > 0) {
@@ -107,7 +106,7 @@ class RequisitionNumberService
             ];
         } else {
             // Ambil data kalkulasi
-            $calculation = $this->calculateNextNumber($squence_batch);
+            $calculation = $this->calculateNextNumber($squence_batch, $fullYear);
             $nextSeq = $calculation['next_sequence'];
         }
 
@@ -120,10 +119,10 @@ class RequisitionNumberService
 
         // update placeholder sequence & date
         $dateReplacements = [
-            'dd'   => date('d'),          // 01 - 31
-            'mm'   => date('m'),          // 01 - 12
-            'MM'   => date('M'),          // Jan - Dec
-            'yy'   => date('y'),          // 25
+            'dd' => date('d'),          // 01 - 31
+            'mm' => date('m'),          // 01 - 12
+            'MM' => date('M'),          // Jan - Dec
+            'yy' => date('y'),          // 25
             'YYYY' => date('Y'),          // 2025
             'year' => $shortYear,         // Alias untuk fallback format lama
             'type_code' => $type_code,
@@ -141,9 +140,9 @@ class RequisitionNumberService
         foreach ($dbSettings as $key => $value) {
             if (function_exists($value)) {
                 try {
-                    $dbReplacements[$key] = $value($replacements); 
+                    $dbReplacements[$key] = $value($replacements);
                 } catch (\Exception $e) {
-                    Log::error("Gagal mengeksekusi helper [{$value}] untuk placeholder {{$key}}: " . $e->getMessage());
+                    Log::error("Gagal mengeksekusi helper [{$value}] untuk placeholder {{$key}}: ".$e->getMessage());
                 }
             } else {
                 Log::warning("Helper fungsi [{$value}()] tidak ditemukan untuk placeholder {{$key}} di dashboard_settings.");
@@ -181,6 +180,7 @@ class RequisitionNumberService
         if (is_null($objectId)) {
             $objectId = isset($param['object_id']) ? (int) $param['object_id'] : (isset($param['id']) ? (int) $param['id'] : null);
         }
+
         return $this->formatNumber((int) $type_id, $squence_batch, array_merge($defaultParams, $param), $objectId)['formatted'];
     }
 
@@ -191,8 +191,8 @@ class RequisitionNumberService
     {
         Log::info('generate SequenceNumber:', [
             'formRequest' => $formRequest,
-            'type_id'      => $type_id,
-            'param'        => $param,
+            'type_id' => $type_id,
+            'param' => $param,
         ]);
 
         $defaultParams = [
@@ -208,9 +208,9 @@ class RequisitionNumberService
         $format = ReportNumberFormat::where('type_id', $type_id)->value('format_string') ?? '{type_code}-{year}-{sequence}';
 
         $batchFormat = $this->resolve($format, array_merge([
-            'type_id'   => $type_id,
+            'type_id' => $type_id,
             'type_code' => $type_code,
-            'year'      => date('y'),
+            'year' => date('y'),
         ], $mergedParams));
 
         $existingSequence = null;
@@ -224,20 +224,17 @@ class RequisitionNumberService
         if ($existingSequence) {
             $nextSequenceNumber = (int) $existingSequence->sequence_number;
         } else {
-            $maxSeq = SequenceNumbers::where('type', $batchFormat)
-                ->where('year', $fullYear)
-                ->max('sequence_number');
-            $nextSequenceNumber = ($maxSeq ?? 0) + 1;
+            $nextSequenceNumber = $this->getNextSequenceNumber($batchFormat, $fullYear);
 
             if ($objectId > 0) {
                 SequenceNumbers::updateOrInsert(
                     ['object_id' => $objectId],
                     [
-                        'type'            => $batchFormat,
-                        'year'            => $fullYear,
+                        'type' => $batchFormat,
+                        'year' => $fullYear,
                         'sequence_number' => $nextSequenceNumber,
-                        'updated_at'      => now(),
-                        'created_at'      => $existingSequence->created_at ?? now(),
+                        'updated_at' => now(),
+                        'created_at' => $existingSequence->created_at ?? now(),
                     ]
                 );
             }
@@ -251,14 +248,14 @@ class RequisitionNumberService
         );
 
         $dateReplacements = [
-            'dd'        => date('d'),
-            'mm'        => date('m'),
-            'MM'        => date('M'),
-            'yy'        => date('y'),
-            'YYYY'      => date('Y'),
-            'year'      => date('y'),
+            'dd' => date('d'),
+            'mm' => date('m'),
+            'MM' => date('M'),
+            'yy' => date('y'),
+            'YYYY' => date('Y'),
+            'year' => date('y'),
             'type_code' => $type_code,
-            'sequence'  => $nextSequenceNumber,
+            'sequence' => $nextSequenceNumber,
         ];
 
         $dbSettings = DB::table('dashboard_settings')
@@ -272,7 +269,7 @@ class RequisitionNumberService
                 try {
                     $dbReplacements[$key] = $value($mergedParams);
                 } catch (\Exception $e) {
-                    Log::error("Gagal helper [{$value}]: " . $e->getMessage());
+                    Log::error("Gagal helper [{$value}]: ".$e->getMessage());
                 }
             }
         }
@@ -281,9 +278,9 @@ class RequisitionNumberService
         $formatted = $this->resolve($format, $replacements);
 
         Log::info('generate SequenceNumber: generated and saved successfully.', [
-            'object_id'        => $objectId,
-            'batch'            => $batchFormat,
-            'sequence_number'  => $nextSequenceNumber,
+            'object_id' => $objectId,
+            'batch' => $batchFormat,
+            'sequence_number' => $nextSequenceNumber,
             'formatted_result' => $formatted,
         ]);
 
@@ -293,20 +290,47 @@ class RequisitionNumberService
     /**
      * Core calculation logic.
      */
-    private function calculateNextNumber(string $squence_batch): array
+    public function calculateNextNumber(string $squence_batch, ?int $fullYear = null): array
     {
-        $fullYear = date('Y');
-        $shortYear = date('y');
+        $fullYear = $fullYear ?? (int) date('Y');
+        $shortYear = date('y', strtotime("{$fullYear}-01-01"));
 
-        $maxSequence = SequenceNumbers::where('type', $squence_batch)
-            ->where('year', $fullYear)
-            ->max('sequence_number');
+        $nextSequence = $this->getNextSequenceNumber($squence_batch, $fullYear);
 
         return [
-            'next_sequence' => ($maxSequence ?? 0) + 1,
+            'next_sequence' => $nextSequence,
             'full_year' => $fullYear,
             'short_year' => $shortYear,
             'squence_batch' => $squence_batch,
         ];
+    }
+
+    /**
+     * Get the smallest available sequence number (fills gaps if any).
+     */
+    public function getNextSequenceNumber(string $squence_batch, int $year): int
+    {
+        $existsOne = SequenceNumbers::where('type', $squence_batch)
+            ->where('year', $year)
+            ->where('sequence_number', 1)
+            ->exists();
+
+        if (! $existsOne) {
+            return 1;
+        }
+
+        $nextSequence = SequenceNumbers::from('sequence_numbers as t1')
+            ->where('t1.type', $squence_batch)
+            ->where('t1.year', $year)
+            ->whereNotExists(function ($query) use ($squence_batch, $year) {
+                $query->select(DB::raw(1))
+                    ->from('sequence_numbers as t2')
+                    ->where('t2.type', $squence_batch)
+                    ->where('t2.year', $year)
+                    ->whereColumn('t2.sequence_number', '=', DB::raw('t1.sequence_number + 1'));
+            })
+            ->min(DB::raw('t1.sequence_number + 1'));
+
+        return (int) ($nextSequence ?? 1);
     }
 }
