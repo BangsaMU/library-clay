@@ -305,6 +305,9 @@ class LibraryClayController extends Controller
 
     public static function updateMaster(array $parmData): string
     {
+        if (self::isMasterDbSameAsDefault()) {
+            return "Database master sama dengan database default, sinkronisasi dilewati.";
+        }
 
         // Format ulang created_at jika ada
         if (!empty($parmData['sync_row']['created_at'])) {
@@ -1693,6 +1696,34 @@ class LibraryClayController extends Controller
         }
 
         return app($modelClass);
+    }
+
+    public static function isMasterDbSameAsDefault(): bool
+    {
+        if (function_exists('is_master_db_same_as_default')) {
+            return is_master_db_same_as_default();
+        }
+
+        $defaultConnName = config('database.default', 'mysql');
+        $defaultConfig = config("database.connections.{$defaultConnName}", []);
+        $masterConfig  = config("database.connections.db_master", []);
+
+        if (empty($defaultConfig) || empty($masterConfig)) {
+            return true;
+        }
+
+        $defaultHost = strtolower(trim($defaultConfig['host'] ?? '127.0.0.1'));
+        $masterHost  = strtolower(trim($masterConfig['host'] ?? '127.0.0.1'));
+        if ($defaultHost === 'localhost') $defaultHost = '127.0.0.1';
+        if ($masterHost === 'localhost')  $masterHost  = '127.0.0.1';
+
+        $defaultPort = (string)($defaultConfig['port'] ?? '3306');
+        $masterPort  = (string)($masterConfig['port'] ?? '3306');
+
+        $defaultDb   = strtolower(trim($defaultConfig['database'] ?? ''));
+        $masterDb    = strtolower(trim($masterConfig['database'] ?? ''));
+
+        return ($defaultHost === $masterHost) && ($defaultPort === $masterPort) && ($defaultDb === $masterDb);
     }
 
 
