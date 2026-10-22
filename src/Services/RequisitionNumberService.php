@@ -154,6 +154,18 @@ class RequisitionNumberService
 
         $formatted = $this->resolve($format, $replacements);
 
+        if (! $existingSequence) {
+            [$nextSeq, $formatted] = $this->skipTakenNumbers(
+                $squence_batch,
+                $fullYear,
+                $nextSeq,
+                (int) $objectId,
+                fn (int $sequence) => $this->resolve($format, array_merge($replacements, ['sequence' => $sequence])),
+            );
+            $calculation['next_sequence'] = $nextSeq;
+            $paddedNumber = str_pad((string) $nextSeq, $this->sequenceWidth($format), '0', STR_PAD_LEFT);
+        }
+
         return [
             'type_id' => $type_id,
             'type_code' => $type_code,
@@ -169,7 +181,8 @@ class RequisitionNumberService
 
     /**
      * Predicts the next available number without saving it.
-     * Safe to use for display purposes on a form.
+     * Safe to use for display purposes on a form. Nomor yang ternyata sudah dipakai
+     * requisition lain dicatat ulang ke sequence_numbers lalu dilewati.
      */
     public function predictNext(string $type_id, array $param = [], ?int $objectId = null): string
     {
@@ -225,27 +238,7 @@ class RequisitionNumberService
             $nextSequenceNumber = (int) $existingSequence->sequence_number;
         } else {
             $nextSequenceNumber = $this->getNextSequenceNumber($batchFormat, $fullYear);
-
-            if ($objectId > 0) {
-                SequenceNumbers::updateOrInsert(
-                    ['object_id' => $objectId],
-                    [
-                        'type' => $batchFormat,
-                        'year' => $fullYear,
-                        'sequence_number' => $nextSequenceNumber,
-                        'updated_at' => now(),
-                        'created_at' => $existingSequence->created_at ?? now(),
-                    ]
-                );
-            }
         }
-
-        $paddedNumber = str_pad(
-            (string) $nextSequenceNumber,
-            $this->sequenceWidth($format),
-            '0',
-            STR_PAD_LEFT
-        );
 
         $dateReplacements = [
             'dd' => date('d'),
@@ -277,6 +270,29 @@ class RequisitionNumberService
         $replacements = array_merge($dateReplacements, $dbReplacements, $mergedParams);
         $formatted = $this->resolve($format, $replacements);
 
+        if (! $existingSequence) {
+            [$nextSequenceNumber, $formatted] = $this->skipTakenNumbers(
+                $batchFormat,
+                $fullYear,
+                $nextSequenceNumber,
+                $objectId,
+                fn (int $sequence) => $this->resolve($format, array_merge($replacements, ['sequence' => $sequence])),
+            );
+
+            if ($objectId > 0) {
+                SequenceNumbers::updateOrInsert(
+                    ['object_id' => $objectId],
+                    [
+                        'type' => $batchFormat,
+                        'year' => $fullYear,
+                        'sequence_number' => $nextSequenceNumber,
+                        'updated_at' => now(),
+                        'created_at' => now(),
+                    ]
+                );
+            }
+        }
+
         Log::info('generate SequenceNumber: generated and saved successfully.', [
             'object_id' => $objectId,
             'batch' => $batchFormat,
@@ -285,6 +301,47 @@ class RequisitionNumberService
         ]);
 
         return $formatted;
+    }
+
+    /**
+     * Lewati nomor yang sudah dipakai requisition lain (termasuk yang soft delete, sama seperti
+     * validasi unique:requisition,code_number). Terjadi kalau sequence_numbers hilang/kosong:
+     * nomor terpakai itu dicatat ulang ke sequence_numbers supaya pencarian celah berikutnya melompatinya.
+     *
+     * @param  callable(int): string  $formatSequence
+     * @return array{0: int, 1: string} [sequence, nomor terformat]
+     */
+    private function skipTakenNumbers(string $batch, int $year, int $sequence, int $objectId, callable $formatSequence): array
+    {
+        $formatted = $formatSequence($sequence);
+
+        for ($guard = 0; $guard < 100000; $guard++) {
+            $owner = DB::table('requisition')
+                ->where('code_number', $formatted)
+                ->when($objectId > 0, fn ($query) => $query->where('id', '!=', $objectId))
+                ->value('id');
+
+            if (! $owner) {
+                break;
+            }
+
+            SequenceNumbers::insertOrIgnore([
+                'object_id' => $owner,
+                'type' => $batch,
+                'year' => $year,
+                'sequence_number' => $sequence,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            Log::warning("Nomor {$formatted} sudah dipakai requisition #{$owner} tapi tidak tercatat di sequence_numbers; dicatat ulang dan dilewati.");
+
+            $next = $this->getNextSequenceNumber($batch, $year);
+            $sequence = $next > $sequence ? $next : $sequence + 1;
+            $formatted = $formatSequence($sequence);
+        }
+
+        return [$sequence, $formatted];
     }
 
     /**
