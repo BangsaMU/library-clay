@@ -81,13 +81,17 @@ class ActivityLog extends Model
 
         $ip = self::getClientPublicIp(request());
 
+        if (!$user && is_array($properties) && app()->runningInConsole() && self::consoleLoggingEnabled()) {
+            $properties['actor'] = $properties['actor'] ?? self::consoleActor();
+        }
+
         $data = [
             'user_id' => $user ? $user->id : null,
             'action' => $action,
             'description' => $description,
             'properties' => $properties,
             'ip_address' => $ip,
-            'user_agent' => substr(request()->userAgent(), 0, 255),
+            'user_agent' => substr((string) request()->userAgent(), 0, 255),
         ];
 
         if ($model) {
@@ -96,6 +100,44 @@ class ActivityLog extends Model
         }
 
         return static::create($data);
+    }
+
+    /**
+     * Opt-in: catat juga perubahan dari console (scheduler, artisan, queue worker).
+     *
+     * @return bool
+     */
+    public static function consoleLoggingEnabled()
+    {
+        return (bool) config('libraryclay.activity_log.console', false);
+    }
+
+    /**
+     * Nama pelaku untuk deskripsi log: nama user login, atau actor system di console.
+     *
+     * @return string
+     */
+    public static function actorName()
+    {
+        $user = auth()->user();
+
+        if ($user) {
+            return (string) $user->name;
+        }
+
+        return app()->runningInConsole() ? self::consoleActor() : 'guest';
+    }
+
+    /**
+     * Actor console, mis. "system:route:scheduled-task" (nama command dari argv).
+     *
+     * @return string
+     */
+    public static function consoleActor()
+    {
+        $command = $_SERVER['argv'][1] ?? null;
+
+        return 'system' . ($command ? ':' . $command : '');
     }
 
     /**

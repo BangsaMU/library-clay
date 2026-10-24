@@ -5,6 +5,16 @@ namespace Bangsamu\LibraryClay\Traits;
 use Bangsamu\LibraryClay\Models\ActivityLog;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * Catat created/updated/deleted model ke activity_logs.
+ *
+ * Model bisa mendefinisikan `protected $loggableIgnore = ['kolom', ...];` untuk kolom yang tidak dicatat
+ * (selain atribut $hidden dan kolom updated_at yang selalu diabaikan). Update yang hanya mengubah kolom
+ * terabaikan tidak dicatat.
+ *
+ * Default hanya mencatat request web dengan user login. Set config `libraryclay.activity_log.console = true`
+ * agar perubahan dari console (scheduler, artisan, queue worker) juga dicatat sebagai actor system.
+ */
 trait Loggable
 {
     /**
@@ -26,44 +36,59 @@ trait Loggable
     public static function bootLoggable()
     {
         static::created(function (Model $model) {
-            if (!app()->runningInConsole() && auth()->check()) {
+            if ($model->shouldLogActivity()) {
                 $model->logActivity(
                     'created',
-                    auth()->user()->name . ' created a new ' . class_basename($model),
+                    ActivityLog::actorName() . ' created a new ' . class_basename($model),
                     $model->getLoggableAttributes()
                 );
             }
         });
 
         static::updated(function (Model $model) {
-            if (!app()->runningInConsole() && auth()->check() && $model->wasChanged()) {
-                $changes = $model->getChanges();
-
-                // Remove unwanted attributes
-                foreach ($model->getHidden() as $hidden) {
-                    unset($changes[$hidden]);
-                }
-
-                $model->logActivity(
-                    'updated',
-                    auth()->user()->name . ' updated ' . class_basename($model),
-                    [
-                        'before' => array_intersect_key($model->getOriginal(), $changes),
-                        'after' => $changes
-                    ]
-                );
+            if (!$model->shouldLogActivity() || !$model->wasChanged()) {
+                return;
             }
+
+            $changes = $model->withoutIgnoredAttributes($model->getChanges());
+
+            if ($changes === []) {
+                return;
+            }
+
+            $model->logActivity(
+                'updated',
+                ActivityLog::actorName() . ' updated ' . class_basename($model),
+                [
+                    'before' => array_intersect_key($model->getOriginal(), $changes),
+                    'after' => $changes
+                ]
+            );
         });
 
         static::deleted(function (Model $model) {
-            if (!app()->runningInConsole() && auth()->check()) {
+            if ($model->shouldLogActivity()) {
                 $model->logActivity(
                     'deleted',
-                    auth()->user()->name . ' deleted ' . class_basename($model),
+                    ActivityLog::actorName() . ' deleted ' . class_basename($model),
                     $model->getLoggableAttributes()
                 );
             }
         });
+    }
+
+    /**
+     * Web: hanya bila ada user login. Console: hanya bila config libraryclay.activity_log.console aktif.
+     *
+     * @return bool
+     */
+    public function shouldLogActivity()
+    {
+        if (app()->runningInConsole()) {
+            return ActivityLog::consoleLoggingEnabled();
+        }
+
+        return auth()->check();
     }
 
     /**
@@ -73,14 +98,24 @@ trait Loggable
      */
     protected function getLoggableAttributes()
     {
-        $attributes = $this->toArray();
+        return $this->withoutIgnoredAttributes($this->toArray());
+    }
 
-        // Remove hidden attributes
-        foreach ($this->getHidden() as $hidden) {
-            unset($attributes[$hidden]);
+    /**
+     * Buang atribut $hidden, $loggableIgnore, dan kolom updated_at.
+     *
+     * @param array $attributes
+     * @return array
+     */
+    protected function withoutIgnoredAttributes(array $attributes)
+    {
+        $ignored = array_merge($this->getHidden(), $this->loggableIgnore ?? []);
+
+        if ($this->usesTimestamps() && $this->getUpdatedAtColumn()) {
+            $ignored[] = $this->getUpdatedAtColumn();
         }
 
-        return $attributes;
+        return array_diff_key($attributes, array_flip($ignored));
     }
 
     /**
