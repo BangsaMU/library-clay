@@ -90,6 +90,45 @@ class LibraryClayMailController extends Controller
     }
 
     /**
+     * GET send-sync / send-env: tidak mengirim apa pun, hanya form konfirmasi yang POST (dengan token CSRF) ke URL
+     * yang sama. Link lama `test-mail/send-*?to=...` tetap bisa dibuka admin, tapi link/img dari halaman lain tidak
+     * lagi bisa memicu pengiriman email.
+     */
+    public function confirmSend(Request $request)
+    {
+        if ($request->expectsJson()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gunakan POST (dengan token CSRF) untuk mengirim test email.',
+            ], 405, ['Allow' => 'POST']);
+        }
+
+        $action = e($request->url());
+        $path = e($request->path());
+        $to = e((string) $request->query('to', ''));
+        $token = e(csrf_token());
+
+        return response(<<<HTML
+            <!DOCTYPE html>
+            <html lang="id">
+            <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Konfirmasi Test Email</title>
+            </head>
+            <body style="font-family: sans-serif; max-width: 480px; margin: 40px auto; padding: 0 16px;">
+            <h3>Kirim test email ({$path})?</h3>
+            <form method="POST" action="{$action}">
+            <input type="hidden" name="_token" value="{$token}">
+            <p><label>Kepada <input type="email" name="to" value="{$to}" required></label></p>
+            <button type="submit">Kirim</button>
+            </form>
+            </body>
+            </html>
+            HTML);
+    }
+
+    /**
      * Resolve public IP address of the server for trace logging.
      */
     private function resolvePublicIp(): string
