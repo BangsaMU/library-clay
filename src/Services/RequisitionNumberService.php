@@ -3,6 +3,7 @@
 namespace Bangsamu\LibraryClay\Services;
 
 use App\Models\Requisition;
+use Bangsamu\LibraryClay\Contracts\NumberFormatResolver;
 use Bangsamu\Master\Models\ReportNumberFormat;
 use Bangsamu\Master\Models\RequisitionType;
 use Bangsamu\Master\Models\SequenceNumbers;
@@ -99,6 +100,7 @@ class RequisitionNumberService
         if (! $format) {
             $format = '{type_code}-{year}-{sequence}';
         }
+        [$format] = $this->resolveFormat($type_id, $format, 'none', array_merge(['type_id' => $type_id, 'type_code' => $type_code], $param));
 
         // Gabungkan placeholder default + tambahan
         $replacements = array_merge([
@@ -253,6 +255,7 @@ class RequisitionNumberService
         $RequisitionType = RequisitionType::find($type_id);
         $type_code = $RequisitionType->code ?? 0;
         $format = ReportNumberFormat::where('type_id', $type_id)->value('format_string') ?? '{type_code}-{year}-{sequence}';
+        [$format] = $this->resolveFormat($type_id, $format, 'none', array_merge(['type_id' => $type_id, 'type_code' => $type_code], $mergedParams));
 
         $batchFormat = $this->resolve($format, array_merge([
             'type_id' => $type_id,
@@ -403,6 +406,30 @@ class RequisitionNumberService
     }
 
     /**
+     * Format dan reset_period akhir untuk satu nomor. App bisa menggantinya per nomor (mis. pola sequence lain untuk
+     * project tertentu) dengan bind Contracts\NumberFormatResolver; tanpa binding format tipe dipakai apa adanya.
+     * Hasil resolver tanpa {sequence} diabaikan supaya nomor tidak pernah kembar.
+     *
+     * @return array{0: string, 1: string} [format, reset_period]
+     */
+    private function resolveFormat(int $typeId, string $format, string $resetPeriod, array $params): array
+    {
+        if (! app()->bound(NumberFormatResolver::class)) {
+            return [$format, $resetPeriod];
+        }
+
+        $resolved = app(NumberFormatResolver::class)->resolve($typeId, $format, $resetPeriod, $params);
+        $resolvedFormat = (string) ($resolved['format'] ?? $format);
+        if (! str_contains($resolvedFormat, '{sequence')) {
+            Log::warning("NumberFormatResolver mengembalikan format tanpa {sequence} ({$resolvedFormat}); format tipe {$typeId} dipakai.");
+
+            return [$format, $resetPeriod];
+        }
+
+        return [$resolvedFormat, (string) ($resolved['reset_period'] ?? $resetPeriod)];
+    }
+
+    /**
      * Format, kode tipe, reset_period, semua token (kecuali sequence), dan bucket untuk satu tipe.
      *
      * @return array{format: string, type_code: mixed, reset_period: string, tokens: array<string, mixed>, bucket: string}
@@ -411,14 +438,18 @@ class RequisitionNumberService
     {
         $typeCode = RequisitionType::find($typeId)->code ?? 0;
         $formatRow = ReportNumberFormat::where('type_id', $typeId)->first();
-        $format = $formatRow->format_string ?? '{type_code}-{year}-{sequence}';
-        $resetPeriod = $formatRow->reset_period ?? 'none';
+        $base = array_merge(['type_id' => $typeId, 'type_code' => $typeCode], $param);
+        [$format, $resetPeriod] = $this->resolveFormat(
+            $typeId,
+            $formatRow->format_string ?? '{type_code}-{year}-{sequence}',
+            $formatRow->reset_period ?? 'none',
+            $base,
+        );
         if (! isset(self::RESET_TOKENS[$resetPeriod])) {
             $resetPeriod = 'none';
         }
 
         $now = now();
-        $base = array_merge(['type_id' => $typeId, 'type_code' => $typeCode], $param);
         $tokens = array_merge([
             'dd' => $now->format('d'),
             'mm' => $now->format('m'),
