@@ -4,9 +4,25 @@
     "type": "library",
     "license": "MIT",
     "require": {},
+    "require-dev": {
+        "mpdf/mpdf": "^8.2",
+        "phpunit/phpunit": "^10.5|^11.0",
+        "setasign/fpdf": "^1.8",
+        "setasign/fpdi": "^2.3",
+        "tecnickcom/tcpdf": "^6.7"
+    },
+    "suggest": {
+        "setasign/fpdi": "Pdf\\OpenParser: FPDI untuk PDF 1.5-1.7 (xref/object stream) tanpa konversi.",
+        "ext-zlib": "Pdf\\OpenParser: membaca stream FlateDecode."
+    },
     "autoload": {
         "psr-4": {
             "Bangsamu\\LibraryClay\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Bangsamu\\LibraryClay\\Tests\\": "tests/"
         }
     },
     "extra": {
@@ -21,5 +37,8 @@
             "name": "infomediaku.com",
             "email": "hatur.cms@gmail.com"
         }
-    ]
+    ],
+    "scripts": {
+        "test": "phpunit"
+    }
 }

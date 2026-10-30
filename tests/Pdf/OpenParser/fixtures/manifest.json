@@ -1,0 +1,437 @@
+[
+ {
+  "file": "rich-classic.pdf",
+  "golden": "rich-classic.json",
+  "note": "reportlab, PDF 1.4 style classic cross-reference table",
+  "pages": 3,
+  "sizes": [
+   [
+    595.276,
+    841.89
+   ],
+   [
+    792.0,
+    612.0
+   ],
+   [
+    550.0,
+    730.0
+   ]
+  ],
+  "importable": true
+ },
+ {
+  "file": "rich-qpdf-objstm.pdf",
+  "golden": "rich-qpdf-objstm.json",
+  "note": "qpdf: PDF 1.5, xref stream (PNG predictor) + object streams",
+  "pages": 3,
+  "sizes": [
+   [
+    595.276,
+    841.89
+   ],
+   [
+    792.0,
+    612.0
+   ],
+   [
+    550.0,
+    730.0
+   ]
+  ],
+  "importable": true
+ },
+ {
+  "file": "rich-qpdf-linearized.pdf",
+  "golden": "rich-qpdf-linearized.json",
+  "note": "qpdf: linearized, xref streams, object streams",
+  "pages": 3,
+  "sizes": [
+   [
+    595.276,
+    841.89
+   ],
+   [
+    792.0,
+    612.0
+   ],
+   [
+    550.0,
+    730.0
+   ]
+  ],
+  "importable": true
+ },
+ {
+  "file": "rich-qpdf-1.7.pdf",
+  "golden": "rich-qpdf-1.7.json",
+  "note": "qpdf: declared as PDF 1.7",
+  "pages": 3,
+  "sizes": [
+   [
+    595.276,
+    841.89
+   ],
+   [
+    792.0,
+    612.0
+   ],
+   [
+    550.0,
+    730.0
+   ]
+  ],
+  "importable": true
+ },
+ {
+  "file": "rich-gs-1.7.pdf",
+  "golden": "rich-gs-1.7.json",
+  "note": "Ghostscript pdfwrite, PDF 1.7",
+  "pages": 3,
+  "sizes": [
+   [
+    595.28,
+    841.89
+   ],
+   [
+    792.0,
+    612.0
+   ],
+   [
+    550.0,
+    730.0
+   ]
+  ],
+  "importable": true
+ },
+ {
+  "file": "rich-mupdf-objstm.pdf",
+  "golden": "rich-mupdf-objstm.json",
+  "note": "MuPDF writer: xref stream + object streams",
+  "pages": 3,
+  "sizes": [
+   [
+    595.276,
+    841.89
+   ],
+   [
+    792.0,
+    612.0
+   ],
+   [
+    550.0,
+    730.0
+   ]
+  ],
+  "importable": true
+ },
+ {
+  "file": "hand-xref-std.pdf",
+  "golden": "hand-xref-std.json",
+  "note": "/W [1 2 1], PNG Up predictor, one object stream",
+  "pages": 2,
+  "sizes": [
+   [
+    595.0,
+    842.0
+   ],
+   [
+    612.0,
+    792.0
+   ]
+  ],
+  "importable": true
+ },
+ {
+  "file": "hand-xref-split-index.pdf",
+  "golden": "hand-xref-split-index.json",
+  "note": "/Index with two subsections",
+  "pages": 2,
+  "sizes": [
+   [
+    595.0,
+    842.0
+   ],
+   [
+    612.0,
+    792.0
+   ]
+  ],
+  "importable": true
+ },
+ {
+  "file": "hand-xref-w0.pdf",
+  "golden": "hand-xref-w0.json",
+  "note": "/W [0 3 0]: type field absent (defaults to 1), no generation field, no predictor",
+  "pages": 2,
+  "sizes": [
+   [
+    595.0,
+    842.0
+   ],
+   [
+    612.0,
+    792.0
+   ]
+  ],
+  "importable": true
+ },
+ {
+  "file": "hand-xref-tiff.pdf",
+  "golden": "hand-xref-tiff.json",
+  "note": "TIFF predictor 2",
+  "pages": 2,
+  "sizes": [
+   [
+    595.0,
+    842.0
+   ],
+   [
+    612.0,
+    792.0
+   ]
+  ],
+  "importable": true
+ },
+ {
+  "file": "hand-filter-chain.pdf",
+  "golden": "hand-filter-chain.json",
+  "note": "xref stream: Flate+ASCIIHex, object stream: Flate+ASCII85",
+  "pages": 2,
+  "sizes": [
+   [
+    595.0,
+    842.0
+   ],
+   [
+    612.0,
+    792.0
+   ]
+  ],
+  "importable": true
+ },
+ {
+  "file": "hand-png-filters.pdf",
+  "golden": "hand-png-filters.json",
+  "note": "400 rows with PNG filters None/Sub/Up/Avg/Paeth",
+  "pages": 2,
+  "sizes": [
+   [
+    595.0,
+    842.0
+   ],
+   [
+    612.0,
+    792.0
+   ]
+  ],
+  "importable": true
+ },
+ {
+  "file": "hand-indirect-length.pdf",
+  "golden": "hand-indirect-length.json",
+  "note": "xref stream whose /Length is an indirect reference",
+  "pages": 2,
+  "sizes": [
+   [
+    595.0,
+    842.0
+   ],
+   [
+    612.0,
+    792.0
+   ]
+  ],
+  "importable": true
+ },
+ {
+  "file": "hand-hybrid.pdf",
+  "golden": "hand-hybrid.json",
+  "note": "hybrid-reference file (classic table + /XRefStm)",
+  "pages": 2,
+  "sizes": [
+   [
+    595.0,
+    842.0
+   ],
+   [
+    612.0,
+    792.0
+   ]
+  ],
+  "importable": true
+ },
+ {
+  "file": "hand-hybrid-free-entries.pdf",
+  "golden": "hand-hybrid.json",
+  "note": "hybrid-reference file whose table lists the hidden objects as free entries",
+  "pages": 2,
+  "sizes": [
+   [
+    595.0,
+    842.0
+   ],
+   [
+    612.0,
+    792.0
+   ]
+  ],
+  "importable": true
+ },
+ {
+  "file": "hand-incremental-xrefstream.pdf",
+  "golden": "hand-incremental-xrefstream.json",
+  "note": "incremental update (xref stream): page 1 replaced, object 8 freed, object 20 added",
+  "pages": 2,
+  "sizes": [
+   [
+    400.0,
+    300.0
+   ],
+   [
+    612.0,
+    792.0
+   ]
+  ],
+  "importable": true
+ },
+ {
+  "file": "hand-incremental-mixed.pdf",
+  "golden": "hand-incremental-mixed.json",
+  "note": "classic-table update appended to an xref-stream file (/Prev chain)",
+  "pages": 2,
+  "sizes": [
+   [
+    400.0,
+    300.0
+   ],
+   [
+    612.0,
+    792.0
+   ]
+  ],
+  "importable": true
+ },
+ {
+  "file": "hand-incremental-twice.pdf",
+  "golden": "hand-incremental-twice.json",
+  "note": "two incremental updates, the newest wins",
+  "pages": 2,
+  "sizes": [
+   [
+    500.0,
+    500.0
+   ],
+   [
+    612.0,
+    792.0
+   ]
+  ],
+  "importable": true
+ },
+ {
+  "file": "damaged-startxref.pdf",
+  "golden": "rich-qpdf-objstm.json",
+  "note": "startxref points to a wrong offset",
+  "pages": 3,
+  "sizes": [
+   [
+    595.276,
+    841.89
+   ],
+   [
+    792.0,
+    612.0
+   ],
+   [
+    550.0,
+    730.0
+   ]
+  ],
+  "importable": true
+ },
+ {
+  "file": "damaged-truncated.pdf",
+  "golden": "rich-qpdf-objstm.json",
+  "note": "file cut off before startxref (no xref pointer, no EOF marker)",
+  "pages": 3,
+  "sizes": [
+   [
+    595.276,
+    841.89
+   ],
+   [
+    792.0,
+    612.0
+   ],
+   [
+    550.0,
+    730.0
+   ]
+  ],
+  "importable": true
+ },
+ {
+  "file": "junk-before-header.pdf",
+  "golden": "rich-qpdf-objstm.json",
+  "note": "garbage before %PDF- (offsets are relative to the header)",
+  "pages": 3,
+  "sizes": [
+   [
+    595.276,
+    841.89
+   ],
+   [
+    792.0,
+    612.0
+   ],
+   [
+    550.0,
+    730.0
+   ]
+  ],
+  "importable": true
+ },
+ {
+  "file": "trailing-garbage.pdf",
+  "golden": "rich-qpdf-objstm.json",
+  "note": "more than 5500 bytes of garbage after %%EOF",
+  "pages": 3,
+  "sizes": [
+   [
+    595.276,
+    841.89
+   ],
+   [
+    792.0,
+    612.0
+   ],
+   [
+    550.0,
+    730.0
+   ]
+  ],
+  "importable": true
+ },
+ {
+  "file": "encrypted-aes256.pdf",
+  "golden": "encrypted-aes256.json",
+  "note": "AES-256 encrypted (empty user password) - must be refused",
+  "pages": 3,
+  "sizes": [
+   [
+    595.276,
+    841.89
+   ],
+   [
+    792.0,
+    612.0
+   ],
+   [
+    550.0,
+    730.0
+   ]
+  ],
+  "importable": false
+ }
+]
