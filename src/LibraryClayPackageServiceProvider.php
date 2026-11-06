@@ -6,9 +6,8 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Http\Kernel;
 use Bangsamu\LibraryClay\Middleware\ForceAppUrl;
-use Illuminate\Support\Facades\Log; 
-use Illuminate\Support\Facades\Artisan;
- 
+use Illuminate\Support\Facades\Log;
+
 
 class LibraryClayPackageServiceProvider extends ServiceProvider
 {
@@ -36,46 +35,12 @@ class LibraryClayPackageServiceProvider extends ServiceProvider
         }
         
 
-        $this->app->booted(function () {
-            try {
-                $cacheKey = 'libraryclay_telescope_prune_registered_' . date('Y-m-d');
-
-                // Jika hari ini sudah didaftarkan, langsung keluar/return
-                if (\Illuminate\Support\Facades\Cache::has($cacheKey)&&!$this->app->runningInConsole()) {
-                    return;
-                }
-
-                // 1. Cek config aktif
-                if (config('telescope.enabled')) {
-                    $commands = \Illuminate\Support\Facades\Artisan::all();
-
-                    // 2. Cek apakah command telescope:prune tersedia
-                    if (isset($commands['telescope:prune'])) {
-                        $schedule = $this->app->make(\Illuminate\Console\Scheduling\Schedule::class);
-
-                        $schedule->command('telescope:prune --hours=720')
-                            ->daily() //  everyMinute() ->daily() atau ->monthly() sesuai kebutuhan
-                            ->onOneServer()
-                            ->runInBackground()
-                            ->onSuccess(function () {
-                                \Log::info('Telescope pruning berhasil dijalankan.');
-                            })
-                            ->onFailure(function () {
-                                \Log::error('Telescope pruning gagal!');
-                            });
-
-                        // Simpan ke cache agar hit berikutnya di hari yang sama tidak menjalankan blok ini
-                        \Illuminate\Support\Facades\Cache::put($cacheKey, true, now()->addDay());
-
-                        \Illuminate\Support\Facades\Log::info("[LibraryClay] Telescope prune didaftarkan (Sekali sehari).");
-                    }
-                }
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning("[LibraryClay] Gagal mendaftarkan telescope prune: " . $e->getMessage());
-            }
+        // Jadwal telescope:prune harian untuk app yang Telescope-nya aktif. Didaftarkan saat Schedule dibuat
+        // (schedule:run, schedule:list, schedule:work), jadi request web dan proses artisan lain tidak menyentuhnya dan
+        // tidak menulis log. Dulu didaftarkan di setiap boot + log INFO setiap proses artisan (ribuan baris sehari).
+        $this->callAfterResolving(Schedule::class, function (Schedule $schedule) {
+            $this->registerTelescopePrune($schedule);
         });
-
-
 
         //
         $this->loadConfig();
@@ -100,6 +65,28 @@ class LibraryClayPackageServiceProvider extends ServiceProvider
         // Daftarkan middleware global
         $kernel = $this->app->make(Kernel::class);
         $kernel->pushMiddleware(ForceAppUrl::class);
+    }
+
+    /**
+     * Daftarkan telescope:prune harian (simpan entri `libraryclay.telescope_prune_hours` jam, bawaan 120 = 5 hari).
+     * Dilewati bila jamnya 0, Telescope nonaktif (`telescope.enabled`), atau provider Telescope tidak termuat (mis.
+     * Telescope hanya dipasang di local). App yang sudah punya jadwal prune sendiri mengisi 0 di config/libraryclay.php.
+     */
+    protected function registerTelescopePrune(Schedule $schedule): void
+    {
+        $hours = (int) config('libraryclay.telescope_prune_hours', 120);
+        $provider = 'Laravel\\Telescope\\TelescopeServiceProvider';
+        if ($hours <= 0 || ! config('telescope.enabled') || ! class_exists($provider) || ! $this->app->providerIsLoaded($provider)) {
+            return;
+        }
+
+        $schedule->command('telescope:prune --hours=' . $hours)
+            ->daily()
+            ->onOneServer()
+            ->runInBackground()
+            ->onFailure(function () {
+                Log::error('[LibraryClay] Telescope prune gagal dijalankan.');
+            });
     }
 
     /**
