@@ -410,36 +410,61 @@ class RequisitionNumberService
      * project tertentu) dengan bind Contracts\NumberFormatResolver; tanpa binding format tipe dipakai apa adanya.
      * Hasil resolver tanpa {sequence} diabaikan supaya nomor tidak pernah kembar.
      *
-     * @return array{0: string, 1: string} [format, reset_period]
+     * @return array{0: string, 1: string, 2: list<string>} [format, reset_period, token non-tanggal yang tidak ikut bucket]
      */
     private function resolveFormat(int $typeId, string $format, string $resetPeriod, array $params): array
     {
         if (! app()->bound(NumberFormatResolver::class)) {
-            return [$format, $resetPeriod];
+            return [$format, $resetPeriod, []];
         }
 
         $resolved = app(NumberFormatResolver::class)->resolve($typeId, $format, $resetPeriod, $params);
         $resolvedFormat = (string) ($resolved['format'] ?? $format);
+        $literalTokens = $this->bucketLiteralTokens($resolved['bucket_literal_tokens'] ?? []);
         if (! str_contains($resolvedFormat, '{sequence')) {
             Log::warning("NumberFormatResolver mengembalikan format tanpa {sequence} ({$resolvedFormat}); format tipe {$typeId} dipakai.");
 
-            return [$format, $resetPeriod];
+            return [$format, $resetPeriod, $literalTokens];
         }
 
-        return [$resolvedFormat, (string) ($resolved['reset_period'] ?? $resetPeriod)];
+        return [$resolvedFormat, (string) ($resolved['reset_period'] ?? $resetPeriod), $literalTokens];
+    }
+
+    /**
+     * Token dari resolver yang boleh dikeluarkan dari bucket: nama token biasa, bukan {sequence} dan bukan token tanggal
+     * (token tanggal diatur reset_period).
+     *
+     * @return list<string>
+     */
+    private function bucketLiteralTokens(mixed $tokens): array
+    {
+        if (! is_array($tokens)) {
+            return [];
+        }
+
+        $valid = array_filter(
+            array_map(fn ($token): string => (string) $token, $tokens),
+            fn (string $token): bool => preg_match('/^\w+$/', $token) === 1
+                && $token !== 'sequence'
+                && ! in_array($token, self::DATE_TOKENS, true),
+        );
+
+        return array_values(array_unique($valid));
     }
 
     /**
      * Format, kode tipe, reset_period, semua token (kecuali sequence), dan bucket untuk satu tipe.
+     * bucket = kelompok urutan; full_bucket = bucket bila semua token non-tanggal ikut (sama dengan bucket kecuali resolver
+     * mengeluarkan token lewat bucket_literal_tokens, mis. bucket per lokasi `...-BLR-{department}-...` vs `...-BLR-CONS-...`).
      *
-     * @return array{format: string, type_code: mixed, reset_period: string, tokens: array<string, mixed>, bucket: string}
+     * @return array{format: string, type_code: mixed, reset_period: string, tokens: array<string, mixed>, bucket: string, full_bucket: string}
      */
     private function numberContext(int $typeId, array $param): array
     {
         $typeCode = RequisitionType::find($typeId)->code ?? 0;
         $formatRow = ReportNumberFormat::where('type_id', $typeId)->first();
         $base = array_merge(['type_id' => $typeId, 'type_code' => $typeCode], $param);
-        [$format, $resetPeriod] = $this->resolveFormat(
+        [$format, $resetPeriod, $scopeLiteralTokens] = $this->resolveFormat(
             $typeId,
             $formatRow->format_string ?? '{type_code}-{year}-{sequence}',
             $formatRow->reset_period ?? 'none',
@@ -463,7 +488,10 @@ class RequisitionNumberService
         unset($tokens['sequence']);
 
         $literalDateTokens = array_diff(self::DATE_TOKENS, self::RESET_TOKENS[$resetPeriod]);
-        $bucket = $this->resolve($format, array_diff_key($tokens, array_flip($literalDateTokens)));
+        $fullBucket = $this->resolve($format, array_diff_key($tokens, array_flip($literalDateTokens)));
+        $bucket = $scopeLiteralTokens === []
+            ? $fullBucket
+            : $this->resolve($format, array_diff_key($tokens, array_flip(array_merge($literalDateTokens, $scopeLiteralTokens))));
 
         return [
             'format' => $format,
@@ -471,7 +499,47 @@ class RequisitionNumberService
             'reset_period' => $resetPeriod,
             'tokens' => $tokens,
             'bucket' => $bucket,
+            'full_bucket' => $fullBucket,
         ];
+    }
+
+    /**
+     * Baris sequence object ada di bucket nomor sekarang: bucket aktif, atau bucket lengkap (nomor terbit sebelum token
+     * dikeluarkan dari bucket, mis. sebelum urutan per lokasi; nomornya tetap dipegang).
+     */
+    private function rowInBucket(?object $row, array $context): bool
+    {
+        return $row !== null && ($row->type === $context['bucket'] || $row->type === $context['full_bucket']);
+    }
+
+    /**
+     * Nomor yang dipertahankan untuk object yang barisnya sudah di bucket ini (mode token keluar dari bucket). Nomor
+     * tersimpan yang masih cocok dengan bucket lengkap dipakai apa adanya. Token di luar bucket berubah (mis. departemen
+     * diganti, lokasi sama): urutan tetap dan nomor dibentuk ulang dengan token baru, selama nomor itu belum dipegang
+     * requisition lain. null = nomor baru diperlukan.
+     */
+    private function keptScopedCode(array $context, object $row, ?string $currentCode, int $objectId): ?string
+    {
+        if ($currentCode && $this->bucketSequence($context['full_bucket'], $currentCode) !== null) {
+            return $currentCode;
+        }
+
+        $formatted = $this->formatSequence($context, (int) $row->sequence_number);
+
+        return $this->codeOwner($formatted, $objectId) ? null : $formatted;
+    }
+
+    /**
+     * Angka sequence dari nomor yang cocok dengan bucket; token yang dibiarkan literal di bucket (tanggal di luar periode
+     * reset, token yang dikeluarkan resolver) boleh berisi apa saja. null bila tidak cocok.
+     */
+    private function bucketSequence(string $bucket, string $code): ?int
+    {
+        $pattern = preg_quote($bucket, '/');
+        $pattern = preg_replace('/\\\\\{sequence(?:\\\\:\d+)?\\\\\}/', '(?<sequence>\d+)', $pattern);
+        $pattern = preg_replace('/\\\\\{\w+\\\\\}/', '.+?', (string) $pattern);
+
+        return preg_match('/^'.$pattern.'$/i', $code, $matches) ? (int) $matches['sequence'] : null;
     }
 
     /** Placeholder tambahan dari dashboard_settings group report_number_format (nilai = nama fungsi helper). */
@@ -592,13 +660,21 @@ class RequisitionNumberService
 
         if ($objectId > 0) {
             $row = SequenceNumbers::where('object_id', $objectId)->first();
-            if ($row && $row->type === $context['bucket']) {
+            if ($row && $context['bucket'] === $context['full_bucket'] && $row->type === $context['bucket']) {
                 $stored = DB::table('requisition')->where('id', $objectId)->value('code_number');
                 $formatted = $stored && $this->sequenceFromCode($context, $stored) !== null
                     ? $stored
                     : $this->formatSequence($context, (int) $row->sequence_number);
 
                 return $this->numberResult($typeId, $context, (int) $row->sequence_number, $formatted, $year);
+            }
+
+            if ($context['bucket'] !== $context['full_bucket'] && $this->rowInBucket($row, $context)) {
+                $stored = DB::table('requisition')->where('id', $objectId)->value('code_number');
+                $formatted = $this->keptScopedCode($context, $row, $stored, $objectId);
+                if ($formatted !== null) {
+                    return $this->numberResult($typeId, $context, (int) $row->sequence_number, $formatted, $year);
+                }
             }
         }
 
@@ -625,14 +701,30 @@ class RequisitionNumberService
                 $row = SequenceNumbers::where('object_id', $objectId)->first();
 
                 /* bucket tidak berubah: nomor yang sudah tersimpan dipertahankan apa adanya */
-                if ($row && $row->type === $bucket) {
+                if ($row && $bucket === $context['full_bucket'] && $row->type === $bucket) {
                     return $currentCode ?: $this->formatSequence($context, (int) $row->sequence_number);
                 }
 
-                /* nomor tersimpan cocok dengan bucket ini tapi barisnya belum ada/di bucket lain: adopsi nomornya */
+                /*
+                 * token keluar dari bucket (mis. urutan per lokasi): baris di bucket ini atau di bucket lengkap (nomor terbit
+                 * sebelumnya) tetap memegang urutannya; token di luar bucket yang berubah dibentuk ulang
+                 */
+                if ($bucket !== $context['full_bucket'] && $this->rowInBucket($row, $context)) {
+                    $kept = $this->keptScopedCode($context, $row, $currentCode, $objectId);
+                    if ($kept !== null) {
+                        return $kept;
+                    }
+                }
+
+                /*
+                 * nomor tersimpan cocok dengan bucket ini tapi barisnya belum ada/di bucket lain: adopsi nomornya, kecuali
+                 * urutan itu sudah dipegang SPB lain atau baris cutoff (object_id NULL) di bucket ini
+                 */
                 $adopted = $currentCode ? $this->sequenceFromCode($context, $currentCode) : null;
                 if ($adopted !== null
-                    && ! SequenceNumbers::where('type', $bucket)->where('sequence_number', $adopted)->where('object_id', '!=', $objectId)->exists()
+                    && ! SequenceNumbers::where('type', $bucket)->where('sequence_number', $adopted)
+                        ->where(fn ($query) => $query->whereNull('object_id')->orWhere('object_id', '!=', $objectId))
+                        ->exists()
                     && ! $this->codeOwner($currentCode, $objectId)) {
                     $this->recordSequence($objectId, $bucket, $year, $adopted);
 
@@ -684,6 +776,7 @@ class RequisitionNumberService
                 'squence_batch' => $context['bucket'],
             ],
             'squence_batch' => $context['bucket'],
+            'full_bucket' => $context['full_bucket'],
             'next_sequence' => $sequence,
             'full_year' => $year,
             'short_year' => substr((string) $year, -2),
